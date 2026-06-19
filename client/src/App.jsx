@@ -308,7 +308,7 @@ export default function App() {
                 <div 
                   key={vid._id}
                   className={`history-card ${isSelected ? 'active' : ''}`}
-                  onClick={() => setSelectedVideo(vid)}
+                  onClick={() => loadVideoInUI(vid)}
                 >
                   <div className="history-card-header">
                     <div className="history-card-title">

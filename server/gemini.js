@@ -100,46 +100,155 @@ Generate a structured JSON output mapping the planned assets according to the pr
  * Fallback mock generator in case of API failures or missing key
  */
 function getMockContent(description) {
-  console.log('[Gemini] Generating fallback mock content.');
+  console.log('[Gemini] Generating fallback mock content dynamically.');
   const lowercaseDesc = description.toLowerCase();
   
-  let name = 'Your Product';
-  let videoQuery = ['coding on laptop vertical', 'person working vertical'];
-  let gifQuery = ['cat laptop', 'typing fast'];
-  let hooks = [
-    'POV: you are trying to write code without breaking it 💀',
-    'me pretending to understand what my boss is saying 🫠',
-    'if this isn\'t your daily routine, what are you doing? 🤨'
+  // 1. Extract Product Name
+  let name = '';
+  const namePatterns = [
+    /product name is (?:a\s+|an\s+)?([a-zA-Z0-9\s-_'"]{1,20})/i,
+    /called (?:a\s+|an\s+)?([a-zA-Z0-9\s-_'"]{1,20})/i,
+    /called:?\s*([a-zA-Z0-9\s-_'"]{1,20})/i,
+    /product:?\s*([a-zA-Z0-9\s-_'"]{1,20})/i,
+    /name:?\s*([a-zA-Z0-9\s-_'"]{1,20})/i,
+    /for (?:a\s+|an\s+)?([a-zA-Z0-9\s-_'"]{1,20})/i,
+    /about (?:a\s+|an\s+)?([a-zA-Z0-9\s-_'"]{1,20})/i
   ];
+
+  for (const pattern of namePatterns) {
+    const match = description.match(pattern);
+    if (match && match[1]) {
+      name = match[1].trim();
+      break;
+    }
+  }
+
+  if (!name) {
+    const urlMatch = description.match(/(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9-]+)\.[a-z]+/i);
+    if (urlMatch && urlMatch[1]) {
+      name = urlMatch[1];
+    }
+  }
+
+  if (!name) {
+    const cleanDesc = description.replace(/https?:\/\/\S+/g, '').replace(/[^a-zA-Z0-9\s]/g, '').trim();
+    const words = cleanDesc.split(/\s+/).filter(w => w.length > 0);
+    if (words.length > 0) {
+      name = words.slice(0, Math.min(3, words.length)).join(' ');
+    }
+  }
+
+  if (!name || name.toLowerCase() === 'pitch') {
+    name = 'Your Product';
+  } else {
+    name = name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+  }
+
+  // 2. Determine Category, Video Keywords, and Hooks
+  let videoQuery = [];
+  let gifQuery = [];
+  let hooks = [];
   let audio = 'energetic_pop';
-  
-  if (lowercaseDesc.includes('fit') || lowercaseDesc.includes('gym') || lowercaseDesc.includes('health') || lowercaseDesc.includes('calorie')) {
-    name = 'FitLife';
+  let vibe = 'funny';
+
+  if (lowercaseDesc.includes('fit') || lowercaseDesc.includes('gym') || lowercaseDesc.includes('health') || lowercaseDesc.includes('calorie') || lowercaseDesc.includes('workout')) {
     videoQuery = ['gym workout vertical', 'person lifting weights vertical'];
     gifQuery = ['heavy lifting', 'tired dog'];
     hooks = [
-      'POV: you finally stopped guessing calories and did this 👀',
-      'me looking at my gym schedule like I actually go 🤡',
-      'when the preworkout hits and you can see colors ⚡'
+      `POV: you finally stopped guessing calories with ${name} 👀`,
+      `me looking at my gym schedule like I actually go 🤡 thanks to ${name}`,
+      `when the preworkout hits and you open ${name} ⚡`
     ];
-    audio = 'energetic_pop';
-  } else if (lowercaseDesc.includes('food') || lowercaseDesc.includes('eat') || lowercaseDesc.includes('cook') || lowercaseDesc.includes('recipe')) {
-    name = 'NomNom';
+    // Randomize fitness music vibes (pop or funk)
+    const fitnessPlaylists = ['energetic_pop', 'funky_groove'];
+    audio = fitnessPlaylists[Math.floor(Math.random() * fitnessPlaylists.length)];
+    vibe = 'energetic';
+  } else if (lowercaseDesc.includes('food') || lowercaseDesc.includes('eat') || lowercaseDesc.includes('cook') || lowercaseDesc.includes('recipe') || lowercaseDesc.includes('tomato') || lowercaseDesc.includes('restaurant')) {
     videoQuery = ['cooking meal close up vertical', 'eating salad vertical'];
     gifQuery = ['tasty food', 'drooling'];
     hooks = [
-      'stop scrolling if you literally hate cooking but love eating 🤤',
-      'my kitchen skills at 2 AM vs normal hours 🍳',
-      'the exact moment I gave up on ordering takeout 💸'
+      `stop scrolling if you literally hate cooking but love eating ${name} 🤤`,
+      `my kitchen skills at 2 AM vs normal hours with ${name} 🍳`,
+      `POV: you tried ${name} and now you can't stop eating it 🍕`
     ];
-    audio = 'funky_groove';
+    // Randomize food music vibes (funk, lofi, or pop)
+    const foodPlaylists = ['funky_groove', 'lofi_chill', 'energetic_pop'];
+    audio = foodPlaylists[Math.floor(Math.random() * foodPlaylists.length)];
+    vibe = 'aesthetic';
+  } else if (lowercaseDesc.includes('code') || lowercaseDesc.includes('dev') || lowercaseDesc.includes('tech') || lowercaseDesc.includes('scale') || lowercaseDesc.includes('api') || lowercaseDesc.includes('laptop') || lowercaseDesc.includes('server') || lowercaseDesc.includes('web') || lowercaseDesc.includes('keyboard') || lowercaseDesc.includes('typing') || lowercaseDesc.includes('app') || lowercaseDesc.includes('software') || lowercaseDesc.includes('ai') || lowercaseDesc.includes('program') || lowercaseDesc.includes('system') || lowercaseDesc.includes('database')) {
+    videoQuery = ['coding on laptop vertical', 'person working vertical'];
+    gifQuery = ['cat laptop', 'typing fast'];
+    hooks = [
+      `POV: you are trying to write code for ${name} without breaking it 💀`,
+      `me pretending to understand what my ${name} code does 🫠`,
+      `unpopular opinion: using ${name} is the only hack that actually works 🤫`
+    ];
+    // Randomize tech music vibes (synth, corporate, or lofi)
+    const techPlaylists = ['dramatic_synth', 'corporate_beat', 'lofi_chill'];
+    audio = techPlaylists[Math.floor(Math.random() * techPlaylists.length)];
+    vibe = 'funny';
+  } else if (lowercaseDesc.includes('sad') || lowercaseDesc.includes('cry') || lowercaseDesc.includes('broken') || lowercaseDesc.includes('bad') || lowercaseDesc.includes('emotional')) {
+    videoQuery = ['rain on window vertical', 'sad person portrait vertical'];
+    gifQuery = ['crying', 'sad face'];
+    hooks = [
+      `POV: when ${name} doesn't work but you still love it 😭`,
+      `me pretending I'm fine but thinking about ${name} 💔`,
+      `that sad moment when you realize you need ${name} in your life 💀`
+    ];
+    // Randomize sad music vibes (dramatic synth or lofi)
+    const sadPlaylists = ['dramatic_synth', 'lofi_chill'];
+    audio = sadPlaylists[Math.floor(Math.random() * sadPlaylists.length)];
+    vibe = 'relatable';
+  } else {
+    // Random default selection
+    const audioOptions = ['energetic_pop', 'lofi_chill', 'funky_groove', 'corporate_beat', 'dramatic_synth'];
+    audio = audioOptions[Math.floor(Math.random() * audioOptions.length)];
+    
+    const vibeOptions = ['energetic', 'calm', 'funny', 'aesthetic', 'relatable'];
+    vibe = vibeOptions[Math.floor(Math.random() * vibeOptions.length)];
+
+    videoQuery = ['abstract gradient loop vertical', 'colorful background loop vertical'];
+    gifQuery = ['mind blown', 'excited'];
+    hooks = [
+      `POV: you finally found ${name} and it changes everything 👀`,
+      `me explaining why I spent my last $20 on ${name} 🤡`,
+      `unpopular opinion: you actually need ${name} in your life 🤫`
+    ];
   }
+
+  // 3. Audio vibe term overrides (if user explicitly requests a genre)
+  if (lowercaseDesc.includes('sad') || lowercaseDesc.includes('emotional') || lowercaseDesc.includes('dramatic')) {
+    audio = 'dramatic_synth';
+  } else if (lowercaseDesc.includes('chill') || lowercaseDesc.includes('lofi') || lowercaseDesc.includes('calm') || lowercaseDesc.includes('relax')) {
+    audio = 'lofi_chill';
+  } else if (lowercaseDesc.includes('funky') || lowercaseDesc.includes('groove') || lowercaseDesc.includes('dance')) {
+    audio = 'funky_groove';
+  } else if (lowercaseDesc.includes('pop') || lowercaseDesc.includes('energetic') || lowercaseDesc.includes('fast')) {
+    audio = 'energetic_pop';
+  } else if (lowercaseDesc.includes('business') || lowercaseDesc.includes('corporate') || lowercaseDesc.includes('work')) {
+    audio = 'corporate_beat';
+  }
+
+  // 4. GIF keyword overrides
+  if (lowercaseDesc.includes('meme') || lowercaseDesc.includes('funny') || lowercaseDesc.includes('laugh')) {
+    gifQuery = ['funny meme', 'hilarious reaction', 'cat reaction'];
+    vibe = 'funny';
+  }
+
+  // 5. Custom hook extraction (quotes check)
+  const quoteMatch = description.match(/"([^"]{8,80})"/);
+  if (quoteMatch && quoteMatch[1]) {
+    hooks.unshift(quoteMatch[1]);
+  }
+
+  // Select a random hook from the generated array to make it different every time!
+  const selectedHook = hooks[Math.floor(Math.random() * hooks.length)] || `POV: you are using ${name} for the first time 😳`;
 
   return {
     productName: name,
-    ugcHooks: hooks,
-    selectedHook: hooks[0],
-    vibe: 'funny',
+    ugcHooks: hooks.length > 0 ? hooks : [selectedHook],
+    selectedHook: selectedHook,
+    vibe: vibe,
     bgVideoKeywords: videoQuery,
     gifKeywords: gifQuery,
     audioVibe: audio

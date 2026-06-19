@@ -115,8 +115,8 @@ export function compositeVideo({ bgVideoPath, gifPath, captionPngPath, rawText, 
       audioIndex++;
     }
 
-    // 1. Cover Scale & Crop Background to 1080x1920
-    let filterString = `[0:v]scale=w='iw*max(1080/iw,1920/ih)':h='ih*max(1080/iw,1920/ih)',crop=1080:1920[bg]`;
+    // 1. Cover Scale & Crop Background to 1080x1920 (9:16 vertical format)
+    let filterString = `[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[bg]`;
 
     // 2. Overlay GIF if exists
     let lastVideoLabel = '[bg]';
