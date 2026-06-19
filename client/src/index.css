@@ -404,18 +404,22 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 24px;
+  justify-content: flex-start; /* Prevent vertical centering cuts on small screens */
+  padding: 16px;
   background: var(--bg-secondary);
   overflow-y: auto;
   position: relative;
+  gap: 16px;
 }
 
 .phone-mockup {
-  width: 270px;
-  height: 480px; /* Perfect 9:16 aspect ratio: 270 x 480 */
+  height: 48vh; /* Responsive height based on laptop screen size */
+  min-height: 280px;
+  max-height: 450px;
+  aspect-ratio: 9 / 16; /* Perfect 9:16 vertical video proportions */
+  width: auto; /* Width auto-calculates based on height to maintain 9:16 ratio */
   background: #000;
-  border-radius: 32px;
+  border-radius: 28px;
   border: 10px solid #1f1f23;
   box-shadow: 0 20px 40px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.05);
   position: relative;
@@ -430,19 +434,19 @@ body {
 /* Slightly larger mockup on taller screens */
 @media (min-height: 800px) {
   .phone-mockup {
-    width: 310px;
-    height: 551px; /* Perfect 9:16 aspect ratio: 310 x 551 */
+    height: 52vh;
+    max-height: 540px;
     border-radius: 36px;
     border-width: 12px;
   }
 }
 
-/* Phone notch */
+/* Phone notch - responsive width */
 .phone-mockup::before {
   content: '';
   position: absolute;
   top: 0;
-  width: 110px;
+  width: 40%;
   height: 18px;
   background: #1f1f23;
   border-bottom-left-radius: 12px;
@@ -462,14 +466,14 @@ body {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 30px;
+  padding: 20px;
   color: var(--text-secondary);
-  gap: 16px;
+  gap: 12px;
 }
 
 .video-placeholder-circle {
-  width: 80px;
-  height: 80px;
+  width: 70px;
+  height: 70px;
   border-radius: 50%;
   background: var(--bg-tertiary);
   border: 2px dashed rgba(255,255,255,0.1);
@@ -480,13 +484,14 @@ body {
 }
 
 .video-details-card {
-  margin-top: 24px;
-  width: 320px;
+  width: 100%;
+  max-width: 320px;
   border-radius: 16px;
-  padding: 16px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .detail-label {
@@ -653,4 +658,52 @@ body {
   background: rgba(168, 85, 247, 0.18);
   border-color: rgba(168, 85, 247, 0.35);
   color: #d8b4fe;
+}
+
+/* Optimize preview panel layout and visibility for smaller laptop viewports */
+@media (max-height: 720px) {
+  .preview-panel {
+    padding: 12px;
+    gap: 12px;
+  }
+  .phone-mockup {
+    height: 52vh;
+    min-height: 290px;
+    max-height: 380px;
+    border-radius: 24px;
+    border-width: 8px;
+  }
+  .video-placeholder-container {
+    padding: 15px;
+    gap: 10px;
+  }
+  .video-placeholder-circle {
+    width: 60px;
+    height: 60px;
+  }
+  .video-details-card {
+    padding: 12px;
+    gap: 8px;
+  }
+  .detail-row {
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    gap: 4px;
+  }
+  .detail-row-split {
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+    gap: 12px;
+  }
+  .concept-name {
+    font-size: 1rem;
+  }
+  .hook-copy {
+    font-size: 0.85rem;
+    padding: 6px 10px;
+  }
+  .tag-pill {
+    font-size: 0.68rem;
+    padding: 3px 8px;
+  }
 }

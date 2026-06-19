@@ -19,9 +19,9 @@ export async function connectDB() {
   console.log(`Connecting to MongoDB at ${mongoUri}...`);
   
   try {
-    // Set connection timeout to 3 seconds to fail fast if Mongo is not running
+    // Set connection timeout to 15 seconds to allow remote Atlas connection
     await mongoose.connect(mongoUri, {
-      serverSelectionTimeoutMS: 3000
+      serverSelectionTimeoutMS: 15000
     });
     console.log('Successfully connected to MongoDB.');
     isFallbackDB = false;
