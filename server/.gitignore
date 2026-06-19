@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Local Environment Variables
+.env
+.env.local
+
+# Databases and Local Storage
+db_fallback.json
+
+# Media Assets & Temporary Caches
+public/cache/*
+!public/cache/.gitkeep
+public/outputs/*
+!public/outputs/.gitkeep
+
+# OS Files
+.DS_Store
+Thumbs.db
