@@ -26,6 +26,7 @@ import {
 } from './assets.js';
 import { renderCaptionImage } from './captionRenderer.js';
 import { compositeVideo } from './renderer.js';
+import { uploadVideoToCloudinary } from './cloudinary.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -121,8 +122,26 @@ async function runVideoGenerationPipeline(recordId, description, url) {
       outputName
     });
 
+    // Cloudinary upload if credentials are provided
+    let videoUrl = relativeVideoPath;
+    try {
+      const absoluteLocalPath = path.join(PUBLIC_DIR, relativeVideoPath);
+      const cloudinaryUrl = await uploadVideoToCloudinary(absoluteLocalPath);
+      if (cloudinaryUrl) {
+        videoUrl = cloudinaryUrl;
+        
+        // Clean up the local output MP4 if we successfully uploaded to Cloudinary
+        if (fs.existsSync(absoluteLocalPath)) {
+          fs.unlinkSync(absoluteLocalPath);
+          console.log('[Pipeline] Cleaned up local composite video after Cloudinary upload.');
+        }
+      }
+    } catch (cloudErr) {
+      console.error('[Pipeline] Cloudinary upload failed, using local fallback:', cloudErr.message);
+    }
+
     // Save final status
-    await updateVideoStatus(recordId, 'completed', { videoPath: relativeVideoPath });
+    await updateVideoStatus(recordId, 'completed', { videoPath: videoUrl });
     console.log(`[Pipeline] Video generation SUCCESS for record: ${recordId}`);
   } catch (error) {
     console.error(`[Pipeline] Pipeline FAILED for record ${recordId}:`, error);

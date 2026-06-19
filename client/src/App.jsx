@@ -454,7 +454,7 @@ export default function App() {
             {selectedVideo && selectedVideo.status === 'completed' && selectedVideo.videoPath ? (
               <video 
                 key={selectedVideo._id}
-                src={`${API_BASE}${selectedVideo.videoPath}`}
+                src={selectedVideo.videoPath.startsWith('http') ? selectedVideo.videoPath : `${API_BASE}${selectedVideo.videoPath}`}
                 controls
                 autoPlay
                 loop
