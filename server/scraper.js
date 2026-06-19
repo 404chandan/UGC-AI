@@ -1,7 +1,9 @@
 import { chromium } from 'playwright';
+import axios from 'axios';
 
 /**
  * Scrapes a website's text content, title, and meta tags using Playwright
+ * with an Axios fallback in case browser launch is restricted or fails.
  * @param {string} url - The URL to scrape
  * @returns {Promise<object>} Scraped title, description, headings, and clean text
  */
@@ -63,12 +65,11 @@ export async function scrapeWebsite(url) {
       // Extract main text content paragraphs
       const paragraphs = Array.from(document.querySelectorAll('p, li, span, div'))
         .map(el => {
-          // Only get direct text to prevent huge duplicates
           const text = el.innerText ? el.innerText.trim() : '';
           return text;
         })
         .filter(text => text && text.split(/\s+/).length > 4 && text.length < 500)
-        .slice(0, 40); // cap number of segments
+        .slice(0, 40);
         
       return {
         headers,
@@ -91,20 +92,60 @@ export async function scrapeWebsite(url) {
     return {
       title,
       description: metaDescription,
-      text: combinedText.slice(0, 5000), // Cap at 5000 characters
+      text: combinedText.slice(0, 5000),
       success: true
     };
   } catch (error) {
-    console.error(`[Scraper] Scrape failed for ${targetUrl}:`, error.message);
+    console.warn(`[Scraper] Headless browser launch/scrape failed: ${error.message}. Using Axios fallback.`);
     if (browser) {
       try {
         await browser.close();
       } catch (_) {}
     }
-    return {
-      error: error.message,
-      text: `Failed to scrape website contents due to error: ${error.message}`,
-      success: false
-    };
+
+    // Axios + regex fallback (cloud-friendly, zero binary requirements)
+    try {
+      const response = await axios.get(targetUrl, {
+        timeout: 8000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      });
+      
+      const html = response.data;
+      
+      // Extract title
+      const titleMatch = html.match(/<title>([^<]*)<\/title>/i);
+      const title = titleMatch ? titleMatch[1].trim() : 'Website';
+      
+      // Extract meta description
+      const descMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i) ||
+                        html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*name=["']description["']/i) ||
+                        html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']*)["']/i);
+      const description = descMatch ? descMatch[1].trim() : '';
+      
+      // Strip scripts, styles and remaining HTML tags
+      let bodyText = html
+        .replace(/<script[^>]*>([\s\S]*?)<\/script>/gi, '')
+        .replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, '')
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+        
+      console.log(`[Scraper] Axios fallback successfully scraped content from ${targetUrl} (${bodyText.length} chars).`);
+      return {
+        title,
+        description,
+        text: `Title: ${title}\nDescription: ${description}\nBody content excerpt:\n${bodyText.slice(0, 3000)}`,
+        success: true
+      };
+    } catch (fallbackError) {
+      console.error(`[Scraper] Axios fallback failed too:`, fallbackError.message);
+      return {
+        error: error.message,
+        text: `Failed to scrape website contents (Playwright: ${error.message}, Axios: ${fallbackError.message})`,
+        success: false
+      };
+    }
   }
 }
