@@ -24,7 +24,7 @@ export async function scrapeWebsite(url) {
   try {
     browser = await chromium.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
     });
     
     const context = await browser.newContext({
@@ -33,9 +33,19 @@ export async function scrapeWebsite(url) {
     });
     
     const page = await context.newPage();
+
+    // Block non-essential asset loads (images, styles, fonts, videos) to speed up loading
+    await page.route('**/*', (route) => {
+      const resourceType = route.request().resourceType();
+      if (['image', 'stylesheet', 'font', 'media', 'other'].includes(resourceType)) {
+        route.abort();
+      } else {
+        route.continue();
+      }
+    });
     
-    // Set shorter timeout (10 seconds) to keep performance fast
-    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 10000 });
+    // Set a fast timeout (6 seconds) since heavy media assets are blocked
+    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 6000 });
     
     // Extract metadata
     const title = await page.title();
@@ -106,7 +116,7 @@ export async function scrapeWebsite(url) {
     // Axios + regex fallback (cloud-friendly, zero binary requirements)
     try {
       const response = await axios.get(targetUrl, {
-        timeout: 8000,
+        timeout: 4000,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
