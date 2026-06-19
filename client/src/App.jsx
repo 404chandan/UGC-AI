@@ -11,7 +11,9 @@ import {
   Loader2, 
   AlertCircle,
   Play,
-  Volume2
+  Volume2,
+  Plus,
+  Trash2
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5000';
@@ -36,20 +38,136 @@ export default function App() {
   const messagesEndRef = useRef(null);
   const pollIntervalRef = useRef(null);
 
+  // Generate default chat bubbles for older database records lacking chatHistory
+  const generateDefaultChatHistory = (video) => {
+    const timeStr = new Date(video.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const list = [
+      {
+        id: 'welcome',
+        sender: 'bot',
+        text: "Hey! 🎬 I'm your UGC video copywriter and editor. Give me a pitch and a website link, and I will write Gen-Z style copy, grab stock footage & reaction GIFs, mix trending audio, and compile a viral 9:16 short for you in seconds! 🚀",
+        time: timeStr
+      },
+      {
+        id: `user-legacy-${video._id}`,
+        sender: 'user',
+        text: `Pitch: "${video.productDescription}"${video.websiteUrl ? `\nWebsite: ${video.websiteUrl}` : ''}`,
+        time: timeStr
+      }
+    ];
+    
+    if (video.status === 'completed') {
+      list.push({
+        id: `done-legacy-${video._id}`,
+        sender: 'bot',
+        text: `✨ Done! Your UGC short is ready. "${video.productName || 'Your product'}" is going to be viral. 📈 Check the interactive phone preview on the right!`,
+        time: timeStr
+      });
+    } else if (video.status === 'failed') {
+      list.push({
+        id: `fail-legacy-${video._id}`,
+        sender: 'bot',
+        text: `❌ Oh no, rendering failed: ${video.error || 'Unknown rendering engine error'}`,
+        time: timeStr
+      });
+    } else {
+      list.push({
+        id: `widget-legacy-${video._id}`,
+        sender: 'bot',
+        text: `Starting assets collection and layout assembly for your product...`,
+        isWidget: true,
+        videoRecordId: video._id,
+        status: video.status,
+        time: timeStr
+      });
+    }
+    
+    return list;
+  };
+
   // Fetch video generation history
   const fetchVideos = async () => {
     try {
       const res = await fetch(`${API_BASE}/api/videos`);
       const data = await res.json();
       setVideos(data);
-      // Select the first completed video as default if none selected
+      
+      // Auto-select first completed video if nothing is active
       if (data.length > 0 && !selectedVideo) {
         const firstCompleted = data.find(v => v.status === 'completed');
-        if (firstCompleted) setSelectedVideo(firstCompleted);
+        if (firstCompleted) loadVideoInUI(firstCompleted);
       }
     } catch (err) {
       console.error('Failed to load video list:', err);
     }
+  };
+
+  // Load a video concept, sync chat panel, and resume polling if active
+  const loadVideoInUI = (video) => {
+    if (!video) {
+      setSelectedVideo(null);
+      setMessages([
+        {
+          id: 'welcome',
+          sender: 'bot',
+          text: "Hey! 🎬 I'm your UGC video copywriter and editor. Give me a pitch and a website link, and I will write Gen-Z style copy, grab stock footage & reaction GIFs, mix trending audio, and compile a viral 9:16 short for you in seconds! 🚀",
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
+      ]);
+      return;
+    }
+    
+    setSelectedVideo(video);
+    
+    // Read saved chat history or use legacy fallback
+    if (video.chatHistory && video.chatHistory.length > 0) {
+      setMessages(video.chatHistory);
+    } else {
+      setMessages(generateDefaultChatHistory(video));
+    }
+
+    // Check if background task is still rendering and we need to poll
+    const isFinished = video.status === 'completed' || video.status === 'failed';
+    if (!isFinished) {
+      startPolling(video._id);
+    } else {
+      // Clear current interval if loading a finished card
+      if (pollIntervalRef.current && activePollId !== video._id) {
+        clearInterval(pollIntervalRef.current);
+        setIsGenerating(false);
+        setActivePollId(null);
+        setCurrentProgress(null);
+      }
+    }
+  };
+
+  // Delete a video record and clear UI states if selected
+  const handleDeleteVideo = async (e, id) => {
+    e.stopPropagation(); // Prevent card selection when clicking delete
+    if (!confirm('Are you sure you want to delete this UGC video?')) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/videos/${id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        if (selectedVideo && selectedVideo._id === id) {
+          loadVideoInUI(null);
+        }
+        fetchVideos();
+      } else {
+        alert('Failed to delete video record');
+      }
+    } catch (err) {
+      console.error('Delete error:', err);
+    }
+  };
+
+  // Reset states to start a new video concept
+  const handleNewVideo = () => {
+    loadVideoInUI(null);
+    setPitchInput('');
+    setUrlInput('');
   };
 
   useEffect(() => {
@@ -89,63 +207,28 @@ export default function App() {
         
         const video = await res.json();
         setCurrentProgress(video);
+        setSelectedVideo(video);
 
-        // Update the active polling widget state in messages
-        setMessages(prev => {
-          return prev.map(msg => {
-            if (msg.videoRecordId === id) {
-              return {
-                ...msg,
-                status: video.status,
-                videoRecord: video
-              };
-            }
-            return msg;
-          });
-        });
+        // Keep local chat panel synced directly with the database's chatHistory
+        if (video.chatHistory && video.chatHistory.length > 0) {
+          setMessages(video.chatHistory);
+        }
 
         // Check if finished
-        if (video.status === 'completed') {
+        if (video.status === 'completed' || video.status === 'failed') {
           clearInterval(pollIntervalRef.current);
           setIsGenerating(false);
           setActivePollId(null);
           setCurrentProgress(null);
           setSelectedVideo(video);
-          
-          setMessages(prev => [
-            ...prev,
-            {
-              id: `done-${id}-${Date.now()}`,
-              sender: 'bot',
-              text: `✨ Done! Your UGC short is ready. "${video.productName || 'Your product'}" is going to be viral. 📈 Check the interactive phone preview on the right!`,
-              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            }
-          ]);
-          
-          fetchVideos();
-        } else if (video.status === 'failed') {
-          clearInterval(pollIntervalRef.current);
-          setIsGenerating(false);
-          setActivePollId(null);
-          setCurrentProgress(null);
-          
-          setMessages(prev => [
-            ...prev,
-            {
-              id: `fail-${id}-${Date.now()}`,
-              sender: 'bot',
-              text: `❌ Oh no, rendering failed: ${video.error || 'Unknown rendering engine error'}`,
-              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            }
-          ]);
-          
-          fetchVideos();
+          fetchVideos(); // Refresh list to update sidebar badges
         }
       } catch (err) {
         console.error('Error during polling:', err);
         clearInterval(pollIntervalRef.current);
         setIsGenerating(false);
         setActivePollId(null);
+        setCurrentProgress(null);
       }
     }, 2000);
   };
@@ -155,25 +238,12 @@ export default function App() {
     e.preventDefault();
     if (!pitchInput.trim() || isGenerating) return;
 
-    const userMessageText = `Pitch: "${pitchInput}"${urlInput ? `\nWebsite: ${urlInput}` : ''}`;
-    const newMsgId = `gen-${Date.now()}`;
-    
-    // Append User Message
-    setMessages(prev => [
-      ...prev,
-      {
-        id: `user-${Date.now()}`,
-        sender: 'user',
-        text: userMessageText,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }
-    ]);
-
     const description = pitchInput;
     const url = urlInput;
     
     setPitchInput('');
     setUrlInput('');
+    setIsGenerating(true);
 
     try {
       const response = await fetch(`${API_BASE}/api/generate`, {
@@ -188,21 +258,8 @@ export default function App() {
 
       const initialRecord = await response.json();
       
-      // Append Bot Loading Message with widget metadata
-      setMessages(prev => [
-        ...prev,
-        {
-          id: newMsgId,
-          sender: 'bot',
-          text: `Starting assets collection and layout assembly for your product...`,
-          isWidget: true,
-          videoRecordId: initialRecord._id,
-          status: 'scraping',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }
-      ]);
-
-      startPolling(initialRecord._id);
+      // Load initial chat and widget layout directly from the db
+      loadVideoInUI(initialRecord);
     } catch (err) {
       setMessages(prev => [
         ...prev,
@@ -213,6 +270,7 @@ export default function App() {
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);
+      setIsGenerating(false);
     }
   };
 
@@ -223,7 +281,14 @@ export default function App() {
       <aside className="sidebar glass-panel">
         <div className="sidebar-header">
           <History className="text-purple-400" size={20} />
-          <h1 className="sidebar-title">UGC Creator Studio</h1>
+          <h1 className="sidebar-title" style={{ flex: 1 }}>UGC Creator Studio</h1>
+          <button 
+            onClick={handleNewVideo} 
+            className="new-video-btn"
+            title="Start New Video"
+          >
+            <Plus size={18} />
+          </button>
         </div>
         
         <div className="history-list">
@@ -245,8 +310,17 @@ export default function App() {
                   className={`history-card ${isSelected ? 'active' : ''}`}
                   onClick={() => setSelectedVideo(vid)}
                 >
-                  <div className="history-card-title">
-                    {vid.productName || 'Analyzing Idea...'}
+                  <div className="history-card-header">
+                    <div className="history-card-title">
+                      {vid.productName || 'Analyzing Idea...'}
+                    </div>
+                    <button 
+                      onClick={(e) => handleDeleteVideo(e, vid._id)}
+                      className="history-card-delete-btn"
+                      title="Delete video"
+                    >
+                      <Trash2 size={13} />
+                    </button>
                   </div>
                   <div className="history-card-desc">
                     {vid.selectedHook || vid.productDescription}
@@ -412,46 +486,48 @@ export default function App() {
 
           {selectedVideo && (
             <div className="video-details-card glass-panel">
-              <div>
+              <div className="detail-row">
                 <div className="detail-label">Concept Name</div>
-                <div className="detail-value font-semibold text-purple-400">
+                <div className="detail-value concept-name">
                   {selectedVideo.productName || 'Planning...'}
                 </div>
               </div>
               
-              <div>
+              <div className="detail-row">
                 <div className="detail-label">Selected Hook Copy</div>
-                <div className="detail-value italic">
+                <div className="detail-value hook-copy">
                   {selectedVideo.selectedHook ? `"${selectedVideo.selectedHook}"` : 'Analyzing pitch...'}
                 </div>
               </div>
 
-              <div className="flex gap-4 justify-between">
-                <div>
-                  <div className="detail-label flex items-center gap-1">
-                    <Music size={12} /> Sound Vibe
+              <div className="detail-row-split">
+                <div className="detail-col">
+                  <div className="detail-label">
+                    <Music size={12} className="detail-icon" /> Sound Vibe
                   </div>
-                  <div className="detail-value capitalize text-xs">
+                  <div className="detail-value capitalize font-medium">
                     {(selectedVideo.audioTrack || 'lofi_chill').replace('_', ' ')}
                   </div>
                 </div>
                 
-                <div>
-                  <div className="detail-label flex items-center gap-1">
-                    <Video size={12} /> Video Status
+                <div className="detail-col">
+                  <div className="detail-label">
+                    <Video size={12} className="detail-icon" /> Video Status
                   </div>
-                  <div className="detail-value capitalize text-xs">
-                    {selectedVideo.status}
+                  <div className="detail-value capitalize">
+                    <span className={`badge badge-${selectedVideo.status}`}>
+                      {selectedVideo.status}
+                    </span>
                   </div>
                 </div>
               </div>
 
               {selectedVideo.keywords?.video && selectedVideo.keywords.video.length > 0 && (
-                <div>
+                <div className="detail-row">
                   <div className="detail-label">Asset Tags</div>
-                  <div className="flex flex-wrap gap-1.5 mt-1">
+                  <div className="tag-pills-container">
                     {[...selectedVideo.keywords.video, ...(selectedVideo.keywords.gif || [])].map((kw, i) => (
-                      <span key={i} className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded">
+                      <span key={i} className="tag-pill">
                         #{kw.toLowerCase().replace(/\s+/g, '')}
                       </span>
                     ))}

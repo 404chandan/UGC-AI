@@ -13,7 +13,8 @@ import {
   createVideoRecord, 
   getVideos, 
   getVideoById, 
-  updateVideoStatus 
+  updateVideoStatus,
+  deleteVideoRecord
 } from './videoModel.js';
 import { scrapeWebsite } from './scraper.js';
 import { planUGCContent } from './gemini.js';
@@ -162,15 +163,49 @@ app.post('/api/generate', async (req, res) => {
   }
 
   try {
+    const tempTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    // Create initial chat history structured context
+    const initialChat = [
+      {
+        id: 'welcome',
+        sender: 'bot',
+        text: "Hey! 🎬 I'm your UGC video copywriter and editor. Give me a pitch and a website link, and I will write Gen-Z style copy, grab stock footage & reaction GIFs, mix trending audio, and compile a viral 9:16 short for you in seconds! 🚀",
+        time: tempTime
+      },
+      {
+        id: `user-${Date.now()}`,
+        sender: 'user',
+        text: `Pitch: "${description}"${url ? `\nWebsite: ${url}` : ''}`,
+        time: tempTime
+      },
+      {
+        id: `widget-${Date.now()}`,
+        sender: 'bot',
+        text: `Starting assets collection and layout assembly for your product...`,
+        isWidget: true,
+        videoRecordId: null, // linked below
+        status: 'scraping',
+        time: tempTime
+      }
+    ];
+
     // Create initial record
     const record = await createVideoRecord({
       productDescription: description,
       websiteUrl: url || '',
-      status: 'scraping'
+      status: 'scraping',
+      chatHistory: initialChat
     });
 
+    const recordId = record._id.toString();
+
+    // Link the created record ID to the status widget inside the chatHistory array
+    initialChat[2].videoRecordId = recordId;
+    await updateVideoStatus(recordId, 'scraping', { chatHistory: initialChat });
+
     // Run pipeline asynchronously so we return HTTP 202 immediately
-    runVideoGenerationPipeline(record._id.toString(), description, url);
+    runVideoGenerationPipeline(recordId, description, url);
 
     res.status(202).json(record);
   } catch (err) {
@@ -186,6 +221,37 @@ app.get('/api/audio-tracks', (req, res) => {
     filename: track.filename
   })));
 });
+
+// Delete a video record and its physical file
+app.delete('/api/videos/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const video = await getVideoById(id);
+    if (!video) {
+      return res.status(404).json({ error: 'Video record not found' });
+    }
+
+    // Delete physical video file if it exists
+    if (video.videoPath) {
+      const physicalPath = path.join(PUBLIC_DIR, video.videoPath);
+      if (fs.existsSync(physicalPath)) {
+        try {
+          fs.unlinkSync(physicalPath);
+          console.log(`[Server] Deleted physical video file: ${physicalPath}`);
+        } catch (fileErr) {
+          console.error(`[Server] Failed to delete physical file: ${fileErr.message}`);
+        }
+      }
+    }
+
+    await deleteVideoRecord(id);
+    console.log(`[Server] Deleted database record: ${id}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 // Server Initialization
 async function startServer() {

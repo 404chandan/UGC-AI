@@ -81,5 +81,17 @@ export const fallbackDB = {
       console.error('Failed to update fallback DB:', e);
       throw e;
     }
+  },
+
+  async delete(id) {
+    try {
+      const records = await this.getAll();
+      const filtered = records.filter(r => r._id !== id);
+      await fs.promises.writeFile(FALLBACK_DB_PATH, JSON.stringify(filtered, null, 2));
+      return true;
+    } catch (e) {
+      console.error('Failed to delete from fallback DB:', e);
+      throw e;
+    }
   }
 };

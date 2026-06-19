@@ -23,11 +23,56 @@ const VideoSchema = new mongoose.Schema({
   gifUrl: { type: String, default: '' },
   audioTrack: { type: String, default: '' },
   videoPath: { type: String, default: '' },
+  chatHistory: { type: [mongoose.Schema.Types.Mixed], default: [] },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
 
 const MongoVideo = mongoose.model('Video', VideoSchema);
+
+// Helper to keep chat history and progress widget steps in sync with db status
+function syncChatHistory(chatHistory, status, errorMsg = '', productName = '') {
+  if (!Array.isArray(chatHistory) || chatHistory.length === 0) {
+    return chatHistory;
+  }
+  
+  // Find widget message in history
+  const widgetIdx = chatHistory.findIndex(m => m.isWidget);
+  if (widgetIdx !== -1) {
+    chatHistory[widgetIdx] = {
+      ...chatHistory[widgetIdx],
+      status: status
+    };
+    if (productName) {
+      chatHistory[widgetIdx].videoRecord = {
+        ...chatHistory[widgetIdx].videoRecord,
+        productName: productName
+      };
+    }
+  }
+  
+  // Check if we already appended a final done/fail message to avoid duplicates
+  const hasFinalMsg = chatHistory.some(m => m.id.startsWith('done-') || m.id.startsWith('fail-'));
+  if (!hasFinalMsg) {
+    if (status === 'completed') {
+      chatHistory.push({
+        id: `done-${Date.now()}`,
+        sender: 'bot',
+        text: `✨ Done! Your UGC short is ready. "${productName || 'Your product'}" is going to be viral. 📈 Check the interactive phone preview on the right!`,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      });
+    } else if (status === 'failed') {
+      chatHistory.push({
+        id: `fail-${Date.now()}`,
+        sender: 'bot',
+        text: `❌ Oh no, rendering failed: ${errorMsg || 'Unknown rendering engine error'}`,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      });
+    }
+  }
+  
+  return chatHistory;
+}
 
 // Unified access layer to handle MongoDB/JSON transparently
 export async function getVideos() {
@@ -66,20 +111,47 @@ export async function createVideoRecord(data) {
 }
 
 export async function updateVideoStatus(id, status, details = {}) {
+  // 1. Fetch current record details to read current chatHistory
+  const record = await getVideoById(id);
+  if (!record) return null;
+
+  // 2. Sync chatHistory based on new status
+  const productName = details.productName || record.productName;
+  const errorMsg = details.error || record.error;
+  const updatedChatHistory = syncChatHistory(
+    [...(record.chatHistory || [])],
+    status,
+    errorMsg,
+    productName
+  );
+
+  const fullDetails = {
+    ...details,
+    chatHistory: updatedChatHistory
+  };
+
   if (isFallbackDB) {
-    return await fallbackDB.updateStatus(id, status, details);
+    return await fallbackDB.updateStatus(id, status, fullDetails);
   } else {
-    const record = await MongoVideo.findById(id);
-    if (!record) return null;
-    record.status = status;
-    record.updatedAt = new Date();
+    const mongoRecord = await MongoVideo.findById(id);
+    if (!mongoRecord) return null;
+    mongoRecord.status = status;
+    mongoRecord.updatedAt = new Date();
     
-    // Dynamically apply other details
-    Object.keys(details).forEach(key => {
-      record[key] = details[key];
+    // Dynamically apply details
+    Object.keys(fullDetails).forEach(key => {
+      mongoRecord[key] = fullDetails[key];
     });
     
-    await record.save();
-    return record;
+    await mongoRecord.save();
+    return mongoRecord;
+  }
+}
+
+export async function deleteVideoRecord(id) {
+  if (isFallbackDB) {
+    return await fallbackDB.delete(id);
+  } else {
+    return await MongoVideo.findByIdAndDelete(id);
   }
 }
