@@ -98,8 +98,15 @@ async function runVideoGenerationPipeline(recordId, description, url) {
     console.log('[Pipeline] Step 4/5: Generating high-end text caption PNG...');
     await updateVideoStatus(recordId, 'rendering', { gifUrl: gifResult.url });
     
-    const captionPngPath = path.join(CACHE_DIR, `caption_${recordId}.png`);
-    await renderCaptionImage(concept.selectedHook, captionPngPath);
+    let captionPngPath = path.join(CACHE_DIR, `caption_${recordId}.png`);
+    let hasCaptionPng = true;
+    try {
+      await renderCaptionImage(concept.selectedHook, captionPngPath);
+    } catch (renderError) {
+      console.warn(`[Pipeline] Caption PNG generation failed: ${renderError.message}. Falling back to FFmpeg drawtext.`);
+      captionPngPath = null;
+      hasCaptionPng = false;
+    }
 
     // Step 5: FFmpeg Layer Compositing
     console.log('[Pipeline] Step 5/5: Compositing layers using FFmpeg...');
@@ -107,7 +114,8 @@ async function runVideoGenerationPipeline(recordId, description, url) {
     const relativeVideoPath = await compositeVideo({
       bgVideoPath,
       gifPath: gifResult.path,
-      captionPngPath,
+      captionPngPath: hasCaptionPng ? captionPngPath : null,
+      rawText: concept.selectedHook,
       audioTrackPath,
       outputName
     });

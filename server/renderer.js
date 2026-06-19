@@ -28,71 +28,127 @@ console.log(`[Renderer] FFprobe binary path: ${ffprobePath}`);
  * @param {string} params.outputName - Filename of final MP4 (e.g. video_123.mp4)
  * @returns {Promise<string>} Path to completed output video (relative to public directory)
  */
-export function compositeVideo({ bgVideoPath, gifPath, captionPngPath, audioTrackPath, outputName }) {
+/**
+ * Wraps text into lines and escapes special characters for FFmpeg's drawtext filter
+ */
+function formatTextForFFmpeg(text, maxChars = 24) {
+  if (!text) return '';
+  
+  // Strip stars and double quotes
+  const cleanText = text.replace(/[*"]/g, '');
+  const words = cleanText.split(' ');
+  const lines = [];
+  let currentLine = '';
+  
+  words.forEach(word => {
+    if ((currentLine + ' ' + word).trim().length <= maxChars) {
+      currentLine = (currentLine + ' ' + word).trim();
+    } else {
+      lines.push(currentLine);
+      currentLine = word;
+    }
+  });
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+  
+  // Escape colons, single quotes, and backslashes for FFmpeg
+  return lines.join('\n')
+    .replace(/\\/g, '\\\\')
+    .replace(/:/g, '\\:')
+    .replace(/'/g, "'\\\\''")
+    .replace(/,/g, '\\,');
+}
+
+/**
+ * Composites background video, looping GIF, text, and audio track into a 9:16 vertical video
+ * @param {object} params
+ * @param {string} params.bgVideoPath - Absolute path to download stock video
+ * @param {string} params.gifPath - Absolute path to downloaded GIF (optional)
+ * @param {string} params.captionPngPath - Absolute path to rendered caption PNG (optional)
+ * @param {string} params.rawText - Raw caption text for FFmpeg drawtext fallback
+ * @param {string} params.audioTrackPath - Absolute path to MP3 background track
+ * @param {string} params.outputName - Filename of final MP4 (e.g. video_123.mp4)
+ * @returns {Promise<string>} Path to completed output video (relative to public directory)
+ */
+export function compositeVideo({ bgVideoPath, gifPath, captionPngPath, rawText, audioTrackPath, outputName }) {
   return new Promise((resolve, reject) => {
     const outputPath = path.join(OUTPUT_DIR, outputName);
     
     console.log(`[Renderer] Starting video compositing for ${outputName}...`);
     const hasGif = !!gifPath;
+    const hasPng = !!captionPngPath;
 
     let filterComplex;
-    let args;
+    let args = ['-y', '-t', '7']; // Overwrite and cap at 7 seconds
 
+    // Add Video Input (0)
+    args.push('-i', bgVideoPath);
+
+    // Add GIF Input if exists (Index depends on GIF availability)
     if (hasGif) {
-      // 4 inputs: bg video (0), GIF (1), caption PNG (2), audio MP3 (3)
-      filterComplex = [
-        `[0:v]scale=w='iw*max(1080/iw,1920/ih)':h='ih*max(1080/iw,1920/ih)',crop=1080:1920[bg]`,
-        `[1:v]scale=360:-1[gif_scaled]`,
-        `[bg][gif_scaled]overlay=x=(1080-w)/2:y=1180:shortest=1[bg_gif]`,
-        `[bg_gif][2:v]overlay=0:0[outv]`
-      ].join(';');
-
-      args = [
-        '-y',                       // Overwrite files
-        '-t', '7',                  // Cut video output to exactly 7 seconds
-        '-i', bgVideoPath,          // Input 0: Background video
-        '-ignore_loop', '0',        // Force looping the GIF input
-        '-i', gifPath,              // Input 1: Reaction GIF
-        '-i', captionPngPath,       // Input 2: Transparent text PNG
-        '-i', audioTrackPath,       // Input 3: Audio MP3 track
-        '-filter_complex', filterComplex,
-        '-map', '[outv]',           // Map our generated video stream
-        '-map', '3:a',              // Map the music track (ignore stock video audio)
-        '-af', 'afade=t=out:st=6:d=1', // Fade out audio from second 6 to 7
-        '-c:v', 'libx264',          // Use H.264 video codec
-        '-preset', 'superfast',     // Render extremely fast
-        '-pix_fmt', 'yuv420p',      // Browser compatible color pixel format
-        '-c:a', 'aac',              // AAC audio codec
-        '-b:a', '192k',             // High quality audio bitrate
-        '-shortest',                // Finish if inputs finish
-        outputPath
-      ];
-    } else {
-      // 3 inputs: bg video (0), caption PNG (1), audio MP3 (2)
-      filterComplex = [
-        `[0:v]scale=w='iw*max(1080/iw,1920/ih)':h='ih*max(1080/iw,1920/ih)',crop=1080:1920[bg]`,
-        `[bg][1:v]overlay=0:0[outv]`
-      ].join(';');
-
-      args = [
-        '-y',                       // Overwrite files
-        '-t', '7',                  // Cut video output to exactly 7 seconds
-        '-i', bgVideoPath,          // Input 0: Background video
-        '-i', captionPngPath,       // Input 1: Transparent text PNG
-        '-i', audioTrackPath,       // Input 2: Audio MP3 track
-        '-filter_complex', filterComplex,
-        '-map', '[outv]',           // Map our generated video stream
-        '-map', '2:a',              // Map the music track (ignore stock video audio)
-        '-af', 'afade=t=out:st=6:d=1', // Fade out audio from second 6 to 7
-        '-c:v', 'libx264',          // Use H.264 video codec
-        '-preset', 'superfast',     // Render extremely fast
-        '-pix_fmt', 'yuv420p',      // Browser compatible color pixel format
-        '-c:a', 'aac',              // AAC audio codec
-        '-b:a', '192k',             // High quality audio bitrate
-        '-shortest',                // Finish if inputs finish
-        outputPath
-      ];
+      args.push('-ignore_loop', '0', '-i', gifPath);
     }
+
+    // Add PNG Input if exists
+    if (hasPng) {
+      args.push('-i', captionPngPath);
+    }
+
+    // Add Audio Input
+    args.push('-i', audioTrackPath);
+
+    // Build filter complex and index mapping dynamically
+    // Indices:
+    // Video: [0:v]
+    // GIF: [1:v] if hasGif
+    // PNG: [2:v] (if hasGif and hasPng) or [1:v] (if hasPng and no GIF)
+    // Audio: last input index
+    const videoIndex = 0;
+    const gifIndex = hasGif ? 1 : -1;
+    let pngIndex = -1;
+    let audioIndex = 1; // default if no GIF and no PNG
+
+    if (hasGif) audioIndex++;
+    if (hasPng) {
+      pngIndex = hasGif ? 2 : 1;
+      audioIndex++;
+    }
+
+    // 1. Cover Scale & Crop Background to 1080x1920
+    let filterString = `[0:v]scale=w='iw*max(1080/iw,1920/ih)':h='ih*max(1080/iw,1920/ih)',crop=1080:1920[bg]`;
+
+    // 2. Overlay GIF if exists
+    let lastVideoLabel = '[bg]';
+    if (hasGif) {
+      filterString += `;[${gifIndex}:v]scale=360:-1[gif_scaled];${lastVideoLabel}[gif_scaled]overlay=x=(1080-w)/2:y=1180:shortest=1[bg_gif]`;
+      lastVideoLabel = '[bg_gif]';
+    }
+
+    // 3. Overlay Text (either transparent PNG overlay or FFmpeg drawtext fallback)
+    if (hasPng) {
+      filterString += `;${lastVideoLabel}[${pngIndex}:v]overlay=0:0[outv]`;
+    } else {
+      // Drawtext fallback using pre-downloaded Outfit-Bold font
+      const formattedText = formatTextForFFmpeg(rawText);
+      const drawtextFilter = `drawtext=fontfile='public/Outfit-Bold.ttf':text='${formattedText}':fontcolor=white:fontsize=46:box=1:boxcolor=0x0C0C0Edc:boxborderw=28:line_spacing=14:x=(w-text_w)/2:y=320[outv]`;
+      filterString += `;${lastVideoLabel}${drawtextFilter}`;
+    }
+
+    // Append filter complex and final maps to arguments
+    args.push(
+      '-filter_complex', filterString,
+      '-map', '[outv]',
+      '-map', `${audioIndex}:a`,
+      '-af', 'afade=t=out:st=6:d=1',
+      '-c:v', 'libx264',
+      '-preset', 'superfast',
+      '-pix_fmt', 'yuv420p',
+      '-c:a', 'aac',
+      '-b:a', '192k',
+      '-shortest',
+      outputPath
+    );
 
     console.log(`[Renderer] Running FFmpeg command...`);
     
@@ -111,7 +167,7 @@ export function compositeVideo({ bgVideoPath, gifPath, captionPngPath, audioTrac
       try {
         if (fs.existsSync(bgVideoPath)) fs.unlinkSync(bgVideoPath);
         if (hasGif && fs.existsSync(gifPath)) fs.unlinkSync(gifPath);
-        if (fs.existsSync(captionPngPath)) fs.unlinkSync(captionPngPath);
+        if (hasPng && fs.existsSync(captionPngPath)) fs.unlinkSync(captionPngPath);
         console.log('[Renderer] Cleaned up temporary asset cache files.');
       } catch (cleanupErr) {
         console.warn('[Renderer] Minor cache cleanup issue:', cleanupErr.message);

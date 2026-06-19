@@ -77,11 +77,36 @@ const FALLBACK_GIFS = {
   failed: 'https://i.giphy.com/11s7Ke7wxVOA8w.gif'
 };
 
+const FONT_PATH = path.join(__dirname, 'public', 'Outfit-Bold.ttf');
+
 /**
- * Downloads audio tracks on startup if they do not exist
+ * Downloads audio tracks and fallback fonts on startup if they do not exist
  */
 export async function downloadAudioTracksOnStartup() {
-  console.log('[Assets] Checking and downloading audio tracks...');
+  console.log('[Assets] Checking and downloading audio tracks and fonts...');
+  
+  // Download Font if missing
+  if (!fs.existsSync(FONT_PATH)) {
+    console.log('[Assets] Downloading fallback font Outfit-Bold.ttf...');
+    try {
+      const response = await axios({
+        method: 'get',
+        url: 'https://fonts.gstatic.com/s/outfit/v15/QGYyz_MVcBeNP4NjuGObqx1XmO1I4deyC4E.ttf',
+        responseType: 'stream',
+        timeout: 15000
+      });
+      const writer = fs.createWriteStream(FONT_PATH);
+      response.data.pipe(writer);
+      await new Promise((resolve, reject) => {
+        writer.on('finish', resolve);
+        writer.on('error', reject);
+      });
+      console.log('[Assets] Successfully downloaded Outfit-Bold.ttf');
+    } catch (err) {
+      console.error('[Assets] Failed to download font:', err.message);
+    }
+  }
+
   for (const [key, track] of Object.entries(AUDIO_TRACKS)) {
     const destPath = path.join(AUDIO_DIR, track.filename);
     if (!fs.existsSync(destPath)) {
