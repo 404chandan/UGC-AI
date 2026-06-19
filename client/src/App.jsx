@@ -13,7 +13,8 @@ import {
   Play,
   Volume2,
   Plus,
-  Trash2
+  Trash2,
+  LogOut
 } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5000';
@@ -35,8 +36,96 @@ export default function App() {
   const [activePollId, setActivePollId] = useState(null);
   const [currentProgress, setCurrentProgress] = useState(null);
 
+  const [token, setToken] = useState(localStorage.getItem('token') || '');
+  const [user, setUser] = useState(null);
+  const [checkingAuth, setCheckingAuth] = useState(!!token);
+  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
+  const [usernameInput, setUsernameInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+
   const messagesEndRef = useRef(null);
   const pollIntervalRef = useRef(null);
+
+  // Validate token on mount or token change
+  useEffect(() => {
+    const initAuth = async () => {
+      if (token) {
+        setCheckingAuth(true);
+        try {
+          const res = await fetch(`${API_BASE}/api/auth/me`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (res.ok) {
+            const userData = await res.json();
+            setUser(userData);
+          } else {
+            handleLogout();
+          }
+        } catch (err) {
+          console.error('Auth verification failed:', err);
+          setUser(null);
+        } finally {
+          setCheckingAuth(false);
+        }
+      } else {
+        setUser(null);
+        setCheckingAuth(false);
+      }
+    };
+    initAuth();
+  }, [token]);
+
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
+    if (!usernameInput.trim() || !passwordInput.trim()) {
+      setAuthError('Please enter both username and password');
+      return;
+    }
+    setAuthError('');
+    setAuthLoading(true);
+    try {
+      const endpoint = authMode === 'login' ? '/api/auth/login' : '/api/auth/register';
+      const res = await fetch(`${API_BASE}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: usernameInput.trim(),
+          password: passwordInput.trim()
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Authentication failed');
+      }
+      localStorage.setItem('token', data.token);
+      setToken(data.token);
+      setUser(data.user);
+      setUsernameInput('');
+      setPasswordInput('');
+    } catch (err) {
+      setAuthError(err.message);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    setToken('');
+    setUser(null);
+    setVideos([]);
+    setSelectedVideo(null);
+    setMessages([
+      {
+        id: 'welcome',
+        sender: 'bot',
+        text: "Hey! 🎬 I'm your UGC video copywriter and editor. Give me a pitch and a website link, and I will write Gen-Z style copy, grab stock footage & reaction GIFs, mix trending audio, and compile a viral 9:16 short for you in seconds! 🚀",
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+    ]);
+  };
 
   // Generate default chat bubbles for older database records lacking chatHistory
   const generateDefaultChatHistory = (video) => {
@@ -87,8 +176,15 @@ export default function App() {
 
   // Fetch video generation history
   const fetchVideos = async () => {
+    if (!token) return;
     try {
-      const res = await fetch(`${API_BASE}/api/videos`);
+      const res = await fetch(`${API_BASE}/api/videos`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.status === 401 || res.status === 403) {
+        handleLogout();
+        return;
+      }
       const data = await res.json();
       setVideos(data);
       
@@ -148,8 +244,13 @@ export default function App() {
 
     try {
       const res = await fetch(`${API_BASE}/api/videos/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
       });
+      if (res.status === 401 || res.status === 403) {
+        handleLogout();
+        return;
+      }
       if (res.ok) {
         if (selectedVideo && selectedVideo._id === id) {
           loadVideoInUI(null);
@@ -171,11 +272,13 @@ export default function App() {
   };
 
   useEffect(() => {
-    fetchVideos();
+    if (token && user) {
+      fetchVideos();
+    }
     return () => {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     };
-  }, []);
+  }, [token, user]);
 
   // Auto scroll chat to bottom
   useEffect(() => {
@@ -202,7 +305,14 @@ export default function App() {
 
     pollIntervalRef.current = setInterval(async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/videos/${id}`);
+        const res = await fetch(`${API_BASE}/api/videos/${id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.status === 401 || res.status === 403) {
+          clearInterval(pollIntervalRef.current);
+          handleLogout();
+          return;
+        }
         if (!res.ok) throw new Error('Video record not found');
         
         const video = await res.json();
@@ -248,9 +358,17 @@ export default function App() {
     try {
       const response = await fetch(`${API_BASE}/api/generate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ description, url })
       });
+
+      if (response.status === 401 || response.status === 403) {
+        handleLogout();
+        return;
+      }
 
       if (!response.ok) {
         throw new Error('Failed to schedule video rendering');
@@ -273,6 +391,106 @@ export default function App() {
       setIsGenerating(false);
     }
   };
+
+  if (checkingAuth) {
+    return (
+      <div className="auth-loading-screen">
+        <Loader2 className="text-purple-500 spinner" size={48} />
+        <p className="auth-loading-text">Reconnecting to UGC Studio...</p>
+      </div>
+    );
+  }
+
+  if (!token || !user) {
+    return (
+      <div className="auth-container">
+        <div className="auth-background-glow"></div>
+        <div className="auth-box glass-panel">
+          <div className="auth-header">
+            <Sparkles className="auth-logo text-purple-400" size={32} />
+            <h1 className="auth-title">UGC Creator Studio</h1>
+            <p className="auth-subtitle">
+              {authMode === 'login' 
+                ? 'Sign in to access your video workspaces' 
+                : 'Create an account to start generating shorts'}
+            </p>
+          </div>
+          
+          <form onSubmit={handleAuthSubmit} className="auth-form">
+            {authError && (
+              <div className="auth-error-bubble">
+                <AlertCircle size={16} className="text-rose-400" />
+                <span>{authError}</span>
+              </div>
+            )}
+            
+            <div className="form-group">
+              <label htmlFor="username">Username</label>
+              <input
+                id="username"
+                type="text"
+                value={usernameInput}
+                onChange={e => setUsernameInput(e.target.value)}
+                placeholder="e.g. chandan"
+                autoComplete="username"
+                required
+                disabled={authLoading}
+              />
+            </div>
+            
+            <div className="form-group">
+              <label htmlFor="password">Password</label>
+              <input
+                id="password"
+                type="password"
+                value={passwordInput}
+                onChange={e => setPasswordInput(e.target.value)}
+                placeholder="••••••••"
+                autoComplete="current-password"
+                required
+                disabled={authLoading}
+              />
+            </div>
+            
+            <button type="submit" className="auth-submit-btn" disabled={authLoading}>
+              {authLoading ? (
+                <>
+                  <Loader2 size={18} className="spinner" />
+                  <span>{authMode === 'login' ? 'Signing in...' : 'Registering...'}</span>
+                </>
+              ) : (
+                <span>{authMode === 'login' ? 'Sign In' : 'Register Account'}</span>
+              )}
+            </button>
+          </form>
+          
+          <div className="auth-toggle">
+            {authMode === 'login' ? (
+              <p>
+                Don't have an account?{' '}
+                <button 
+                  onClick={() => { setAuthMode('register'); setAuthError(''); }}
+                  disabled={authLoading}
+                >
+                  Register Here
+                </button>
+              </p>
+            ) : (
+              <p>
+                Already have an account?{' '}
+                <button 
+                  onClick={() => { setAuthMode('login'); setAuthError(''); }}
+                  disabled={authLoading}
+                >
+                  Sign In Here
+                </button>
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="app-container">
@@ -335,6 +553,22 @@ export default function App() {
               );
             })
           )}
+        </div>
+
+        {/* User Profile and Logout */}
+        <div className="sidebar-footer">
+          <div className="user-profile">
+            <div className="user-avatar">
+              {user.username.slice(0, 2).toUpperCase()}
+            </div>
+            <div className="user-info">
+              <span className="username">{user.username}</span>
+              <span className="user-role">Creator</span>
+            </div>
+          </div>
+          <button onClick={handleLogout} className="logout-btn" title="Logout">
+            <LogOut size={16} />
+          </button>
         </div>
       </aside>
 

@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { isFallbackDB, fallbackDB } from './db.js';
 
 const VideoSchema = new mongoose.Schema({
+  userId: { type: String, required: true },
   productName: { type: String, default: '' },
   productDescription: { type: String, required: true },
   websiteUrl: { type: String, default: '' },
@@ -75,11 +76,12 @@ function syncChatHistory(chatHistory, status, errorMsg = '', productName = '') {
 }
 
 // Unified access layer to handle MongoDB/JSON transparently
-export async function getVideos() {
+export async function getVideos(userId) {
   if (isFallbackDB) {
-    return await fallbackDB.getAll();
+    const all = await fallbackDB.getAll();
+    return all.filter(r => r.userId === userId);
   } else {
-    return await MongoVideo.find().sort({ createdAt: -1 });
+    return await MongoVideo.find({ userId }).sort({ createdAt: -1 });
   }
 }
 

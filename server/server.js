@@ -27,6 +27,28 @@ import {
 import { renderCaptionImage } from './captionRenderer.js';
 import { compositeVideo } from './renderer.js';
 import { uploadVideoToCloudinary } from './cloudinary.js';
+import jwt from 'jsonwebtoken';
+import { registerUser, authenticateUser, findUserById } from './userModel.js';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'ugc_studio_super_secret_key_12345';
+
+// Authentication verification middleware
+export function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer <token>
+
+  if (!token) {
+    return res.status(401).json({ error: 'Authentication token required' });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+    req.user = user;
+    next();
+  });
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -151,22 +173,85 @@ async function runVideoGenerationPipeline(recordId, description, url) {
 
 // API Routes
 
-// Get all generated videos
-app.get('/api/videos', async (req, res) => {
+// --- Auth Routes ---
+
+// Register User
+app.post('/api/auth/register', async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !username.trim() || !password || !password.trim()) {
+    return res.status(400).json({ error: 'Username and password are required' });
+  }
+
   try {
-    const list = await getVideos();
+    const user = await registerUser(username, password);
+    const userId = user._id || user.id;
+    const token = jwt.sign({ id: userId, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
+    res.status(201).json({
+      token,
+      user: { id: userId, username: user.username }
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Login User
+app.post('/api/auth/login', async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !username.trim() || !password || !password.trim()) {
+    return res.status(400).json({ error: 'Username and password are required' });
+  }
+
+  try {
+    const user = await authenticateUser(username, password);
+    const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({
+      token,
+      user
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Get profile details
+app.get('/api/auth/me', authenticateToken, async (req, res) => {
+  try {
+    const user = await findUserById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User profile not found' });
+    }
+    res.json({
+      id: user._id || user.id,
+      username: user.username
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// --- Video Generation Routes (Authorized) ---
+
+// Get all generated videos (scoped to authenticated user)
+app.get('/api/videos', authenticateToken, async (req, res) => {
+  try {
+    const list = await getVideos(req.user.id);
     res.json(list);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Get a single video status
-app.get('/api/videos/:id', async (req, res) => {
+// Get a single video status (scoped to owner)
+app.get('/api/videos/:id', authenticateToken, async (req, res) => {
   try {
     const video = await getVideoById(req.params.id);
     if (!video) {
       return res.status(404).json({ error: 'Video record not found' });
+    }
+    if (video.userId !== req.user.id) {
+      return res.status(403).json({ error: 'Access denied: You do not own this video record' });
     }
     res.json(video);
   } catch (err) {
@@ -174,8 +259,8 @@ app.get('/api/videos/:id', async (req, res) => {
   }
 });
 
-// Trigger new video generation
-app.post('/api/generate', async (req, res) => {
+// Trigger new video generation (scoped to owner)
+app.post('/api/generate', authenticateToken, async (req, res) => {
   const { description, url } = req.body;
   if (!description || !description.trim()) {
     return res.status(400).json({ error: 'Product description is required' });
@@ -209,8 +294,9 @@ app.post('/api/generate', async (req, res) => {
       }
     ];
 
-    // Create initial record
+    // Create initial record with userId
     const record = await createVideoRecord({
+      userId: req.user.id,
       productDescription: description,
       websiteUrl: url || '',
       status: 'scraping',
@@ -241,13 +327,16 @@ app.get('/api/audio-tracks', (req, res) => {
   })));
 });
 
-// Delete a video record and its physical file
-app.delete('/api/videos/:id', async (req, res) => {
+// Delete a video record (scoped to owner)
+app.delete('/api/videos/:id', authenticateToken, async (req, res) => {
   try {
     const id = req.params.id;
     const video = await getVideoById(id);
     if (!video) {
       return res.status(404).json({ error: 'Video record not found' });
+    }
+    if (video.userId !== req.user.id) {
+      return res.status(403).json({ error: 'Access denied: You do not own this video record' });
     }
 
     // Delete physical video file if it exists
