@@ -71,8 +71,8 @@ Generate a structured JSON output mapping the planned assets according to the pr
         },
         audioVibe: { 
           type: "string", 
-          description: "Music genre to overlay",
-          enum: ["energetic_pop", "lofi_chill", "funky_groove", "corporate_beat", "dramatic_synth"] 
+          description: "Music vibe to overlay. Choose 'mission_impossible' for suspense/hacking/tech/action, 'pink_panther' for funny/sneaky/quirky, 'imperial_march' for villain/warning/fail, 'gonna_fly_now' for motivational/fitness/success, 'titanic_sad' for sad/emotional/dramatic.",
+          enum: ["mission_impossible", "pink_panther", "imperial_march", "gonna_fly_now", "titanic_sad"] 
         }
       },
       required: ["productName", "ugcHooks", "selectedHook", "vibe", "bgVideoKeywords", "gifKeywords", "audioVibe"]
@@ -148,7 +148,7 @@ function getMockContent(description) {
   let videoQuery = [];
   let gifQuery = [];
   let hooks = [];
-  let audio = 'energetic_pop';
+  let audio = 'gonna_fly_now';
   let vibe = 'funny';
 
   if (lowercaseDesc.includes('fit') || lowercaseDesc.includes('gym') || lowercaseDesc.includes('health') || lowercaseDesc.includes('calorie') || lowercaseDesc.includes('workout')) {
@@ -159,9 +159,7 @@ function getMockContent(description) {
       `me looking at my gym schedule like I actually go 🤡 thanks to ${name}`,
       `when the preworkout hits and you open ${name} ⚡`
     ];
-    // Randomize fitness music vibes (pop or funk)
-    const fitnessPlaylists = ['energetic_pop', 'funky_groove'];
-    audio = fitnessPlaylists[Math.floor(Math.random() * fitnessPlaylists.length)];
+    audio = 'gonna_fly_now'; // Rocky theme
     vibe = 'energetic';
   } else if (lowercaseDesc.includes('food') || lowercaseDesc.includes('eat') || lowercaseDesc.includes('cook') || lowercaseDesc.includes('recipe') || lowercaseDesc.includes('tomato') || lowercaseDesc.includes('restaurant')) {
     videoQuery = ['cooking meal close up vertical', 'eating salad vertical'];
@@ -171,9 +169,7 @@ function getMockContent(description) {
       `my kitchen skills at 2 AM vs normal hours with ${name} 🍳`,
       `POV: you tried ${name} and now you can't stop eating it 🍕`
     ];
-    // Randomize food music vibes (funk, lofi, or pop)
-    const foodPlaylists = ['funky_groove', 'lofi_chill', 'energetic_pop'];
-    audio = foodPlaylists[Math.floor(Math.random() * foodPlaylists.length)];
+    audio = 'pink_panther'; // quirky theme
     vibe = 'aesthetic';
   } else if (lowercaseDesc.includes('code') || lowercaseDesc.includes('dev') || lowercaseDesc.includes('tech') || lowercaseDesc.includes('scale') || lowercaseDesc.includes('api') || lowercaseDesc.includes('laptop') || lowercaseDesc.includes('server') || lowercaseDesc.includes('web') || lowercaseDesc.includes('keyboard') || lowercaseDesc.includes('typing') || lowercaseDesc.includes('app') || lowercaseDesc.includes('software') || lowercaseDesc.includes('ai') || lowercaseDesc.includes('program') || lowercaseDesc.includes('system') || lowercaseDesc.includes('database')) {
     videoQuery = ['coding on laptop vertical', 'person working vertical'];
@@ -183,9 +179,7 @@ function getMockContent(description) {
       `me pretending to understand what my ${name} code does 🫠`,
       `unpopular opinion: using ${name} is the only hack that actually works 🤫`
     ];
-    // Randomize tech music vibes (synth, corporate, or lofi)
-    const techPlaylists = ['dramatic_synth', 'corporate_beat', 'lofi_chill'];
-    audio = techPlaylists[Math.floor(Math.random() * techPlaylists.length)];
+    audio = 'mission_impossible'; // hack/suspense theme
     vibe = 'funny';
   } else if (lowercaseDesc.includes('sad') || lowercaseDesc.includes('cry') || lowercaseDesc.includes('broken') || lowercaseDesc.includes('bad') || lowercaseDesc.includes('emotional')) {
     videoQuery = ['rain on window vertical', 'sad person portrait vertical'];
@@ -195,13 +189,11 @@ function getMockContent(description) {
       `me pretending I'm fine but thinking about ${name} 💔`,
       `that sad moment when you realize you need ${name} in your life 💀`
     ];
-    // Randomize sad music vibes (dramatic synth or lofi)
-    const sadPlaylists = ['dramatic_synth', 'lofi_chill'];
-    audio = sadPlaylists[Math.floor(Math.random() * sadPlaylists.length)];
+    audio = 'titanic_sad'; // sad theme
     vibe = 'relatable';
   } else {
     // Random default selection
-    const audioOptions = ['energetic_pop', 'lofi_chill', 'funky_groove', 'corporate_beat', 'dramatic_synth'];
+    const audioOptions = ['mission_impossible', 'pink_panther', 'imperial_march', 'gonna_fly_now', 'titanic_sad'];
     audio = audioOptions[Math.floor(Math.random() * audioOptions.length)];
     
     const vibeOptions = ['energetic', 'calm', 'funny', 'aesthetic', 'relatable'];
@@ -216,17 +208,17 @@ function getMockContent(description) {
     ];
   }
 
-  // 3. Audio vibe term overrides (if user explicitly requests a genre)
-  if (lowercaseDesc.includes('sad') || lowercaseDesc.includes('emotional') || lowercaseDesc.includes('dramatic')) {
-    audio = 'dramatic_synth';
-  } else if (lowercaseDesc.includes('chill') || lowercaseDesc.includes('lofi') || lowercaseDesc.includes('calm') || lowercaseDesc.includes('relax')) {
-    audio = 'lofi_chill';
-  } else if (lowercaseDesc.includes('funky') || lowercaseDesc.includes('groove') || lowercaseDesc.includes('dance')) {
-    audio = 'funky_groove';
-  } else if (lowercaseDesc.includes('pop') || lowercaseDesc.includes('energetic') || lowercaseDesc.includes('fast')) {
-    audio = 'energetic_pop';
-  } else if (lowercaseDesc.includes('business') || lowercaseDesc.includes('corporate') || lowercaseDesc.includes('work')) {
-    audio = 'corporate_beat';
+  // 3. Audio vibe term overrides (if user explicitly requests a theme or emotion)
+  if (lowercaseDesc.includes('sad') || lowercaseDesc.includes('emotional') || lowercaseDesc.includes('cry')) {
+    audio = 'titanic_sad';
+  } else if (lowercaseDesc.includes('epic') || lowercaseDesc.includes('action') || lowercaseDesc.includes('suspense') || lowercaseDesc.includes('mission') || lowercaseDesc.includes('hack')) {
+    audio = 'mission_impossible';
+  } else if (lowercaseDesc.includes('villain') || lowercaseDesc.includes('evil') || lowercaseDesc.includes('fail') || lowercaseDesc.includes('darth') || lowercaseDesc.includes('star wars') || lowercaseDesc.includes('imperial')) {
+    audio = 'imperial_march';
+  } else if (lowercaseDesc.includes('fitness') || lowercaseDesc.includes('motivation') || lowercaseDesc.includes('workout') || lowercaseDesc.includes('rocky') || lowercaseDesc.includes('win')) {
+    audio = 'gonna_fly_now';
+  } else if (lowercaseDesc.includes('funny') || lowercaseDesc.includes('sneaky') || lowercaseDesc.includes('comedy') || lowercaseDesc.includes('panther')) {
+    audio = 'pink_panther';
   }
 
   // 4. GIF keyword overrides

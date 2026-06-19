@@ -110,8 +110,15 @@ async function runVideoGenerationPipeline(recordId, description, url) {
     console.log('[Pipeline] Step 3/5: Downloading video and GIF assets...');
     const bgVideoPath = await getBackgroundVideo(concept.bgVideoKeywords, concept.vibe);
     const gifResult = await getOverlayGIF(concept.gifKeywords);
-    
-    const audioTrackConfig = AUDIO_TRACKS[concept.audioVibe] || AUDIO_TRACKS.energetic_pop;
+    let finalAudioVibe = concept.audioVibe;
+    // Map legacy vibes to new Hollywood BGMs
+    if (finalAudioVibe === 'energetic_pop') finalAudioVibe = 'gonna_fly_now';
+    else if (finalAudioVibe === 'funky_groove') finalAudioVibe = 'pink_panther';
+    else if (finalAudioVibe === 'dramatic_synth') finalAudioVibe = 'mission_impossible';
+    else if (finalAudioVibe === 'corporate_beat') finalAudioVibe = 'gonna_fly_now';
+    else if (finalAudioVibe === 'lofi_chill') finalAudioVibe = 'titanic_sad';
+
+    const audioTrackConfig = AUDIO_TRACKS[finalAudioVibe] || AUDIO_TRACKS.gonna_fly_now;
     const audioTrackPath = path.join(AUDIO_DIR, audioTrackConfig.filename);
     
     if (!fs.existsSync(audioTrackPath)) {

@@ -13,32 +13,32 @@ const CACHE_DIR = path.join(__dirname, 'public', 'cache');
 fs.mkdirSync(AUDIO_DIR, { recursive: true });
 fs.mkdirSync(CACHE_DIR, { recursive: true });
 
-// Curated royalty-free background music mapping
+// Curated famous Hollywood songs and BGMs mapping
 export const AUDIO_TRACKS = {
-  energetic_pop: {
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-    filename: 'energetic_pop.mp3',
-    title: 'Upbeat Energetic Pop'
+  mission_impossible: {
+    url: 'https://archive.org/download/tvtunes_455/Mission%20Impossible.mp3',
+    filename: 'mission_impossible.mp3',
+    title: 'Mission: Impossible BGM'
   },
-  lofi_chill: {
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3',
-    filename: 'lofi_chill.mp3',
-    title: 'Lo-Fi Chill Beat'
+  pink_panther: {
+    url: 'https://archive.org/download/tvtunes_502/Pink%20Panther.mp3',
+    filename: 'pink_panther.mp3',
+    title: 'The Pink Panther Theme'
   },
-  funky_groove: {
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
-    filename: 'funky_groove.mp3',
-    title: 'Funky Groove Bass'
+  imperial_march: {
+    url: 'https://archive.org/download/tvtunes_16519/Star%20Wars%20-%20The%20Imperial%20March.mp3',
+    filename: 'imperial_march.mp3',
+    title: 'Star Wars: Imperial March'
   },
-  corporate_beat: {
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
-    filename: 'corporate_beat.mp3',
-    title: 'Modern Corporate Beat'
+  gonna_fly_now: {
+    url: 'https://archive.org/download/tvtunes_18483/Rocky%20-%20Bill%20Conti%20-%20Gonna%20Fly%20Now.mp3',
+    filename: 'gonna_fly_now.mp3',
+    title: 'Rocky: Gonna Fly Now'
   },
-  dramatic_synth: {
-    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3',
-    filename: 'dramatic_synth.mp3',
-    title: 'Dramatic Cyber Synth'
+  titanic_sad: {
+    url: 'https://archive.org/download/romanticas90/Celine%20Dion%20-%20My%20Heart%20Will%20Go%20On.mp3',
+    filename: 'titanic_sad.mp3',
+    title: 'Titanic: My Heart Will Go On'
   }
 };
 
