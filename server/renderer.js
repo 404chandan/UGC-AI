@@ -11,27 +11,20 @@ const __dirname = path.dirname(__filename);
 const ffmpegPath = ffmpegInstaller.path;
 const ffprobePath = ffprobeInstaller.path;
 
-// Ensure output directory exists
+// Ensure directories exist
 const OUTPUT_DIR = path.join(__dirname, 'public', 'outputs');
 fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+
+const CACHE_DIR = path.join(__dirname, 'public', 'cache');
+fs.mkdirSync(CACHE_DIR, { recursive: true });
 
 console.log(`[Renderer] FFmpeg binary path: ${ffmpegPath}`);
 console.log(`[Renderer] FFprobe binary path: ${ffprobePath}`);
 
 /**
- * Composites background video, looping GIF, text PNG, and audio track into a 9:16 vertical video
- * @param {object} params
- * @param {string} params.bgVideoPath - Absolute path to download stock video
- * @param {string} params.gifPath - Absolute path to downloaded GIF
- * @param {string} params.captionPngPath - Absolute path to rendered caption PNG
- * @param {string} params.audioTrackPath - Absolute path to MP3 background track
- * @param {string} params.outputName - Filename of final MP4 (e.g. video_123.mp4)
- * @returns {Promise<string>} Path to completed output video (relative to public directory)
+ * Wraps text into lines for writing to a textfile used by FFmpeg's drawtext filter
  */
-/**
- * Wraps text into lines and escapes special characters for FFmpeg's drawtext filter
- */
-function formatTextForFFmpeg(text, maxChars = 24) {
+function wrapText(text, maxChars = 24) {
   if (!text) return '';
   
   // Strip stars and double quotes
@@ -52,12 +45,7 @@ function formatTextForFFmpeg(text, maxChars = 24) {
     lines.push(currentLine);
   }
   
-  // Escape colons, single quotes, and backslashes for FFmpeg
-  return lines.join('\n')
-    .replace(/\\/g, '\\\\')
-    .replace(/:/g, '\\:')
-    .replace(/'/g, "'\\\\''")
-    .replace(/,/g, '\\,');
+  return lines.join('\n');
 }
 
 /**
@@ -126,12 +114,29 @@ export function compositeVideo({ bgVideoPath, gifPath, captionPngPath, rawText, 
     }
 
     // 3. Overlay Text (either transparent PNG overlay or FFmpeg drawtext fallback)
+    let textFilePath = null;
+    let hasTextFile = false;
+
     if (hasPng) {
       filterString += `;${lastVideoLabel}[${pngIndex}:v]overlay=0:0[outv]`;
     } else {
       // Drawtext fallback using pre-downloaded Outfit-Bold font
-      const formattedText = formatTextForFFmpeg(rawText);
-      const drawtextFilter = `drawtext=fontfile='public/Outfit-Bold.ttf':text='${formattedText}':fontcolor=white:fontsize=46:box=1:boxcolor=0x0C0C0Edc:boxborderw=28:line_spacing=14:x=(w-text_w)/2:y=320[outv]`;
+      const textFileRelativePath = `public/cache/text_${outputName.replace('.mp4', '')}.txt`;
+      textFilePath = path.join(__dirname, textFileRelativePath);
+      
+      try {
+        const formattedText = wrapText(rawText);
+        fs.writeFileSync(textFilePath, formattedText, 'utf8');
+        hasTextFile = true;
+        console.log(`[Renderer] Wrote fallback text to temporary file: ${textFilePath}`);
+      } catch (writeErr) {
+        console.error('[Renderer] Failed to write temporary text file:', writeErr);
+        return reject(new Error(`Failed to write temporary text file: ${writeErr.message}`));
+      }
+
+      // Convert backslashes to forward slashes for FFmpeg compatibility
+      const ffmpegTextFile = textFileRelativePath.replace(/\\/g, '/');
+      const drawtextFilter = `drawtext=fontfile='public/Outfit-Bold.ttf':textfile='${ffmpegTextFile}':fontcolor=white:fontsize=46:box=1:boxcolor=0x0C0C0Edc:boxborderw=28:line_spacing=14:x=(w-text_w)/2:y=320[outv]`;
       filterString += `;${lastVideoLabel}${drawtextFilter}`;
     }
 
@@ -155,6 +160,13 @@ export function compositeVideo({ bgVideoPath, gifPath, captionPngPath, rawText, 
     const startTime = Date.now();
     const child = execFile(ffmpegPath, args, (error, stdout, stderr) => {
       if (error) {
+        // Clean up temporary text file even on error
+        try {
+          if (hasTextFile && textFilePath && fs.existsSync(textFilePath)) fs.unlinkSync(textFilePath);
+        } catch (cleanupErr) {
+          console.warn('[Renderer] Minor cache cleanup issue on error:', cleanupErr.message);
+        }
+
         console.error('[Renderer] FFmpeg execution error:', error);
         console.error('[Renderer] FFmpeg stderr logs:', stderr);
         return reject(new Error(`FFmpeg composite failed: ${error.message}`));
@@ -168,6 +180,7 @@ export function compositeVideo({ bgVideoPath, gifPath, captionPngPath, rawText, 
         if (fs.existsSync(bgVideoPath)) fs.unlinkSync(bgVideoPath);
         if (hasGif && fs.existsSync(gifPath)) fs.unlinkSync(gifPath);
         if (hasPng && fs.existsSync(captionPngPath)) fs.unlinkSync(captionPngPath);
+        if (hasTextFile && textFilePath && fs.existsSync(textFilePath)) fs.unlinkSync(textFilePath);
         console.log('[Renderer] Cleaned up temporary asset cache files.');
       } catch (cleanupErr) {
         console.warn('[Renderer] Minor cache cleanup issue:', cleanupErr.message);
