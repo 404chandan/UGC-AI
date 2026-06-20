@@ -46,6 +46,7 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(false);
 
   const messagesEndRef = useRef(null);
+  const chatContainerRef = useRef(null);
   const pollIntervalRef = useRef(null);
 
   // Validate token on mount or token change
@@ -280,9 +281,30 @@ export default function App() {
     };
   }, [token, user]);
 
-  // Auto scroll chat to bottom
+  // Track last selected video ID to detect selection changes
+  const lastSelectedVideoIdRef = useRef(null);
+
+  // Auto scroll chat to bottom when messages or progress updates
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = chatContainerRef.current;
+    if (!container) return;
+
+    const currentId = selectedVideo ? selectedVideo._id : null;
+    const isNewSelection = currentId !== lastSelectedVideoIdRef.current;
+    lastSelectedVideoIdRef.current = currentId;
+
+    const lastMessage = messages[messages.length - 1];
+    const userJustSent = lastMessage && lastMessage.sender === 'user';
+
+    // Force scroll to bottom on new selection or when the user just typed/sent a message.
+    // Otherwise, only auto-scroll down if the user is already near the bottom of the chat list.
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+
+    if (isNewSelection || userJustSent || isNearBottom) {
+      messagesEndRef.current?.scrollIntoView({ 
+        behavior: isNewSelection ? 'auto' : 'smooth' 
+      });
+    }
   }, [messages, currentProgress]);
 
   // Status-to-Step mapping helper
@@ -542,6 +564,7 @@ export default function App() {
               <label htmlFor="username">Username</label>
               <input
                 id="username"
+                name="username"
                 type="text"
                 value={usernameInput}
                 onChange={e => setUsernameInput(e.target.value)}
@@ -556,6 +579,7 @@ export default function App() {
               <label htmlFor="password">Password</label>
               <input
                 id="password"
+                name="password"
                 type="password"
                 value={passwordInput}
                 onChange={e => setPasswordInput(e.target.value)}
@@ -698,7 +722,7 @@ export default function App() {
             </h2>
           </div>
 
-          <div className="chat-messages">
+          <div ref={chatContainerRef} className="chat-messages">
             {messages.map(msg => (
               <div key={msg.id} className={`message-wrapper ${msg.sender}`}>
                 <div className="message-sender">
@@ -765,6 +789,8 @@ export default function App() {
           <div className="chat-input-bar">
             <form onSubmit={handleSendMessage} className="chat-input-form">
               <textarea
+                id="pitch-input"
+                name="pitch"
                 value={pitchInput}
                 onChange={e => setPitchInput(e.target.value)}
                 onKeyDown={handleKeyDown}
@@ -776,6 +802,8 @@ export default function App() {
               <div className="chat-url-row">
                 <Globe className="chat-url-icon" size={16} />
                 <input
+                  id="url-input"
+                  name="url"
                   type="text"
                   value={urlInput}
                   onChange={e => setUrlInput(e.target.value)}

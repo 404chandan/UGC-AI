@@ -19,9 +19,76 @@ export async function scrapeWebsite(url) {
   }
 
   console.log(`[Scraper] Starting scrape for ${targetUrl}...`);
-  let browser = null;
-  
+
+  // 1. Try Axios first (extremely fast, low resource usage, cloud-friendly)
   try {
+    console.log(`[Scraper] Trying Axios extraction for ${targetUrl}...`);
+    const response = await axios.get(targetUrl, {
+      timeout: 4000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+
+    const html = response.data;
+    
+    // Extract title
+    const titleMatch = html.match(/<title>([^<]*)<\/title>/i);
+    const title = titleMatch ? titleMatch[1].trim() : 'Website';
+    
+    // Extract meta description
+    const descMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i) ||
+                      html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*name=["']description["']/i) ||
+                      html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']*)["']/i);
+    const description = descMatch ? descMatch[1].trim() : '';
+
+    // Extract headings
+    const headings = [];
+    const headingRegex = /<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi;
+    let match;
+    while ((match = headingRegex.exec(html)) !== null && headings.length < 10) {
+      const cleanHeading = match[1].replace(/<[^>]*>/g, '').trim().replace(/\s+/g, ' ');
+      if (cleanHeading) headings.push(cleanHeading);
+    }
+
+    // Extract paragraph texts
+    const paragraphs = [];
+    const paragraphRegex = /<p[^>]*>([\s\S]*?)<\/p>/gi;
+    while ((match = paragraphRegex.exec(html)) !== null && paragraphs.length < 25) {
+      const cleanParagraph = match[1].replace(/<[^>]*>/g, '').trim().replace(/\s+/g, ' ');
+      if (cleanParagraph && cleanParagraph.split(/\s+/).length > 4 && cleanParagraph.length < 500) {
+        paragraphs.push(cleanParagraph);
+      }
+    }
+
+    const combinedText = [
+      `Title: ${title}`,
+      `Meta Description: ${description}`,
+      `Key Headings: ${headings.join(' | ')}`,
+      `Body Content excerpt:`,
+      ...paragraphs
+    ].join('\n');
+
+    // If we extracted a reasonable amount of text, return it immediately to avoid Playwright launch!
+    if (combinedText.length >= 300) {
+      console.log(`[Scraper] Axios successfully scraped content from ${targetUrl} (${combinedText.length} chars). Bypassing Playwright.`);
+      return {
+        title,
+        description,
+        text: combinedText.slice(0, 5000),
+        success: true
+      };
+    } else {
+      console.log(`[Scraper] Axios retrieved insufficient text (${combinedText.length} chars). Falling back to Playwright.`);
+    }
+  } catch (axiosError) {
+    console.warn(`[Scraper] Axios extraction failed: ${axiosError.message}. Falling back to Playwright.`);
+  }
+
+  // 2. Playwright fallback (runs headless browser for heavy SPA sites)
+  let browser = null;
+  try {
+    console.log(`[Scraper] Launching Playwright browser for ${targetUrl}...`);
     browser = await chromium.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
@@ -98,64 +165,24 @@ export async function scrapeWebsite(url) {
       ...extractedData.paragraphs.slice(0, 15)
     ].join('\n');
 
-    console.log(`[Scraper] Successfully scraped content from ${targetUrl} (${combinedText.length} chars).`);
+    console.log(`[Scraper] Playwright successfully scraped content from ${targetUrl} (${combinedText.length} chars).`);
     return {
       title,
       description: metaDescription,
       text: combinedText.slice(0, 5000),
       success: true
     };
-  } catch (error) {
-    console.warn(`[Scraper] Headless browser launch/scrape failed: ${error.message}. Using Axios fallback.`);
+  } catch (playwrightError) {
+    console.error(`[Scraper] Playwright failed:`, playwrightError.message);
     if (browser) {
       try {
         await browser.close();
       } catch (_) {}
     }
-
-    // Axios + regex fallback (cloud-friendly, zero binary requirements)
-    try {
-      const response = await axios.get(targetUrl, {
-        timeout: 4000,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
-      });
-      
-      const html = response.data;
-      
-      // Extract title
-      const titleMatch = html.match(/<title>([^<]*)<\/title>/i);
-      const title = titleMatch ? titleMatch[1].trim() : 'Website';
-      
-      // Extract meta description
-      const descMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i) ||
-                        html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*name=["']description["']/i) ||
-                        html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']*)["']/i);
-      const description = descMatch ? descMatch[1].trim() : '';
-      
-      // Strip scripts, styles and remaining HTML tags
-      let bodyText = html
-        .replace(/<script[^>]*>([\s\S]*?)<\/script>/gi, '')
-        .replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, '')
-        .replace(/<[^>]*>/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-        
-      console.log(`[Scraper] Axios fallback successfully scraped content from ${targetUrl} (${bodyText.length} chars).`);
-      return {
-        title,
-        description,
-        text: `Title: ${title}\nDescription: ${description}\nBody content excerpt:\n${bodyText.slice(0, 3000)}`,
-        success: true
-      };
-    } catch (fallbackError) {
-      console.error(`[Scraper] Axios fallback failed too:`, fallbackError.message);
-      return {
-        error: error.message,
-        text: `Failed to scrape website contents (Playwright: ${error.message}, Axios: ${fallbackError.message})`,
-        success: false
-      };
-    }
+    return {
+      error: playwrightError.message,
+      text: `Failed to scrape website contents (Axios and Playwright failed. Playwright: ${playwrightError.message})`,
+      success: false
+    };
   }
 }
