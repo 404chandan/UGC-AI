@@ -1,5 +1,35 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+const getModelsToTry = () => {
+  const preferred = process.env.GEMINI_MODEL;
+  const defaults = ['gemini-3.1-flash-lite', 'gemini-2.5-flash-lite', 'gemini-2.5-flash'];
+  if (preferred) {
+    return [preferred, ...defaults.filter(m => m !== preferred)];
+  }
+  return defaults;
+};
+
+async function generateContentWithFallback(genAI, generateOptions) {
+  const models = getModelsToTry();
+  let lastError = null;
+
+  for (const modelName of models) {
+    try {
+      console.log(`[Gemini] Attempting content generation with model: ${modelName}`);
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(generateOptions);
+      console.log(`[Gemini] Successfully generated content using model: ${modelName}`);
+      return result;
+    } catch (error) {
+      console.warn(`[Gemini] Model ${modelName} failed:`, error.message);
+      lastError = error;
+      continue;
+    }
+  }
+
+  throw lastError || new Error('All Gemini models failed.');
+}
+
 /**
  * Generates UGC hooks, search keywords, and vibes using Gemini API
  * @param {string} description - User's product description
@@ -15,9 +45,6 @@ export async function planUGCContent(description, scrapedContent) {
 
   console.log('[Gemini] Planning UGC content with Gemini...');
   const genAI = new GoogleGenerativeAI(apiKey);
-  
-  // Use gemini-2.5-flash as the fast, cost-effective default model
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
   const prompt = `
 You are a Gen Z UGC (User Generated Content) TikTok & Instagram Reels viral marketing expert.
@@ -78,7 +105,7 @@ Generate a structured JSON output mapping the planned assets according to the pr
       required: ["productName", "ugcHooks", "selectedHook", "vibe", "bgVideoKeywords", "gifKeywords", "audioVibe"]
     };
 
-    const result = await model.generateContent({
+    const result = await generateContentWithFallback(genAI, {
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: {
         responseMimeType: "application/json",
@@ -296,7 +323,6 @@ export async function chatWithDirector(message, chatHistory = []) {
 
   console.log('[Gemini] Conversational chat query with UGC Director...');
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
   // Format past history for Gemini context if available
   const historyText = chatHistory
@@ -352,7 +378,7 @@ Generate a structured JSON output according to the provided schema.
       required: ["isGenerationRequest", "description", "url", "reply"]
     };
 
-    const result = await model.generateContent({
+    const result = await generateContentWithFallback(genAI, {
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: {
         responseMimeType: "application/json",
@@ -501,7 +527,6 @@ export async function validateMarketingPitch(description, url) {
 
   console.log('[Gemini] Validating marketing pitch...');
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
   const prompt = `
 You are an expert marketing reviewer. Your task is to analyze a proposed video generation request and determine if it contains a valid, sensible product description/pitch or a valid website URL that can be used to generate a marketing video.
@@ -537,7 +562,7 @@ Generate a structured JSON output with the following fields:
       required: ["isValid", "reason"]
     };
 
-    const result = await model.generateContent({
+    const result = await generateContentWithFallback(genAI, {
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: {
         responseMimeType: "application/json",
