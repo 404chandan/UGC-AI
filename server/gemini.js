@@ -501,7 +501,7 @@ export async function validateMarketingPitch(description, url) {
 
   console.log('[Gemini] Validating marketing pitch...');
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
   const prompt = `
 You are an expert marketing reviewer. Your task is to analyze a proposed video generation request and determine if it contains a valid, sensible product description/pitch or a valid website URL that can be used to generate a marketing video.
