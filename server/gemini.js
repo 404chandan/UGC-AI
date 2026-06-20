@@ -369,16 +369,34 @@ function getMockChatResponse(message, chatHistory) {
     };
   }
 
-  // Conversational response options
+  // Conversational response options based on keywords
   let reply = '';
-  if (cleanMsg === 'hi' || cleanMsg === 'hello' || cleanMsg === 'hey') {
-    reply = "Hey! 🎬 UGC Director here. Ready to write some viral hooks, find stock footage, and compile a premium short-form video? Just paste a product description/website, or click 'Produce Video' to start!";
+  if (cleanMsg === 'hi' || cleanMsg === 'hello' || cleanMsg === 'hey' || cleanMsg === 'yo') {
+    reply = "Hey there! 👋 I am UGC Chat, your personal video editor and director. Ready to write some viral hooks, find stock loops, and compile a premium short-form video? Just describe your product or type 'Make a video for [product name]'!";
+  } else if (cleanMsg.includes('who are you') || cleanMsg.includes('your name') || cleanMsg.includes('what are you')) {
+    reply = "I am UGC Chat! 🎬 I'm a Gen-Z styled UGC video copywriter, planner, and editor. I help you turn ideas or website links into short-form viral videos in seconds.";
   } else if (cleanMsg.includes('what can you do') || cleanMsg.includes('help') || cleanMsg.includes('features')) {
-    reply = "I can generate UGC videos for you! Just send me a product URL and I'll create an engaging short-form marketing video complete with stock loops, transparent text overlays, viral reaction GIFs, and audio vibes! 🎥📈";
+    reply = "I can generate full UGC video shorts! Provide a website URL or product pitch, and I'll script viral hooks, grab stock videos/gifs, mix trending audio, and compile a 9:16 video. E.g. try: 'Make a video for a smart water bottle'";
   } else if (cleanMsg.includes('hook') || cleanMsg.includes('viral')) {
     reply = "Viral hooks need to be self-aware and Gen-Z focused! E.g. 'POV: you finally stopped doing X 👀'. I write these dynamically to hook viewers in the first 3 seconds!";
+  } else if (cleanMsg.includes('music') || cleanMsg.includes('audio') || cleanMsg.includes('sound')) {
+    reply = "I mix trending Hollywood and cinematic audio tracks like the Rocky theme, Mission Impossible suspense BGM, Darth Vader's Imperial March, or Titanic's emotional theme!";
+  } else if (cleanMsg.includes('joke')) {
+    reply = "Why did the video editor go to therapy? Because they had too many cuts and couldn't resolve their transition issues! 🎬😂";
+  } else if (cleanMsg.includes('thank') || cleanMsg.includes('cool') || cleanMsg.includes('awesome') || cleanMsg.includes('nice')) {
+    reply = "Aww, thank you! I'm here to help you get views and go viral. Let's make some content! 📈✨";
   } else {
-    reply = `I hear you! I'm your virtual UGC director. If you'd like to build a video, just click 'Produce Video' or ask me directly like "Make a video for [your product name]"!`;
+    // Generate a contextual-looking response echoing back some query parts
+    const topics = [];
+    if (cleanMsg.includes('how')) topics.push('how it works');
+    if (cleanMsg.includes('create')) topics.push('creating content');
+    if (cleanMsg.includes('why')) topics.push('marketing stats');
+    
+    if (topics.length > 0) {
+      reply = `That's a great question about ${topics.join(' and ')}! As UGC Chat, I plan templates, select vertical visuals, overlay Gen-Z captions, and compile everything using FFmpeg. Would you like to generate a video test now?`;
+    } else {
+      reply = `I hear you! I am UGC Chat. Since my AI connection is currently offline, I can chat with you about video tips, or you can describe your product pitch (e.g. 'Make a video for a fitness tracker') to start producing! 🚀`;
+    }
   }
 
   return {

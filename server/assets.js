@@ -45,24 +45,44 @@ export const AUDIO_TRACKS = {
 // Curated fallback vertical videos (9:16 portrait format)
 const FALLBACK_VIDEOS = [
   {
-    keywords: ['workout', 'gym', 'fitness', 'exercise', 'health'],
+    keywords: ['workout', 'gym', 'fitness', 'exercise', 'health', 'lifting'],
     url: 'https://videos.pexels.com/video-files/3252061/3252061-hd_1080_1920_25fps.mp4' // Gym lift vertical
   },
   {
-    keywords: ['cooking', 'food', 'recipe', 'eat', 'kitchen'],
+    keywords: ['workout', 'gym', 'fitness', 'exercise', 'health', 'lifting'],
+    url: 'https://videos.pexels.com/video-files/3752538/3752538-hd_1080_1920_25fps.mp4' // Fitness running vertical
+  },
+  {
+    keywords: ['cooking', 'food', 'recipe', 'eat', 'kitchen', 'restaurant'],
     url: 'https://videos.pexels.com/video-files/3196238/3196238-hd_1080_1920_25fps.mp4' // Kitchen pouring vertical
   },
   {
-    keywords: ['coding', 'laptop', 'typing', 'computer', 'work', 'office'],
+    keywords: ['coding', 'laptop', 'typing', 'computer', 'work', 'office', 'programming', 'dev'],
     url: 'https://videos.pexels.com/video-files/852423/852423-hd_1280_720_24fps.mp4' // Keyboard typing (will crop to 9:16)
   },
   {
-    keywords: ['coffee', 'cafe', 'morning', 'drink'],
+    keywords: ['coding', 'laptop', 'typing', 'computer', 'work', 'office', 'programming', 'dev'],
+    url: 'https://videos.pexels.com/video-files/4383416/4383416-hd_1080_1920_25fps.mp4' // Person typing laptop portrait
+  },
+  {
+    keywords: ['coffee', 'cafe', 'morning', 'drink', 'beverage'],
     url: 'https://videos.pexels.com/video-files/3099955/3099955-hd_1080_1920_25fps.mp4' // Coffee dripping vertical
   },
   {
-    keywords: ['abstract', 'gradient', 'loop', 'aesthetic', 'calm'],
+    keywords: ['abstract', 'gradient', 'loop', 'aesthetic', 'calm', 'vibe'],
     url: 'https://videos.pexels.com/video-files/854298/854298-hd_1280_720_30fps.mp4' // Colorful abstract loop
+  },
+  {
+    keywords: ['shopping', 'unboxing', 'package', 'box', 'gift', 'delivery'],
+    url: 'https://videos.pexels.com/video-files/2795400/2795400-hd_1080_1920_25fps.mp4' // Opening package vertical
+  },
+  {
+    keywords: ['phone', 'scroll', 'app', 'mobile', 'screen', 'social'],
+    url: 'https://videos.pexels.com/video-files/6321252/6321252-hd_1080_1920_25fps.mp4' // Phone scroll vertical
+  },
+  {
+    keywords: ['funny', 'laugh', 'smile', 'happy', 'joke', 'reaction'],
+    url: 'https://videos.pexels.com/video-files/4828608/4828608-hd_1080_1920_25fps.mp4' // Girl laughing vertical
   }
 ];
 
@@ -143,14 +163,17 @@ export async function getBackgroundVideo(keywords, vibe) {
   let videoUrl = '';
 
   if (pexelsKey) {
-    const query = keywords && keywords.length > 0 ? keywords[0] : 'abstract vertical';
+    // Select a random keyword from the list to make the search query diverse!
+    const query = keywords && keywords.length > 0 
+      ? keywords[Math.floor(Math.random() * keywords.length)] 
+      : 'abstract vertical';
     console.log(`[Assets] Searching Pexels for: "${query}"...`);
     try {
       const response = await axios.get('https://api.pexels.com/videos/search', {
         headers: { Authorization: pexelsKey },
         params: {
           query,
-          per_page: 5,
+          per_page: 30, // Request up to 30 vertical videos for high variety
           orientation: 'portrait' // Get 9:16 vertical videos directly!
         },
         timeout: 8000
@@ -232,14 +255,17 @@ export async function getOverlayGIF(keywords) {
   let gifUrl = '';
 
   if (giphyKey) {
-    const query = keywords && keywords.length > 0 ? keywords[0] : 'funny emoji';
+    // Select a random keyword from the list to keep overlays unique!
+    const query = keywords && keywords.length > 0 
+      ? keywords[Math.floor(Math.random() * keywords.length)] 
+      : 'funny emoji';
     console.log(`[Assets] Searching Giphy for: "${query}"...`);
     try {
       const response = await axios.get('https://api.giphy.com/v1/gifs/search', {
         params: {
           api_key: giphyKey,
           q: query,
-          limit: 5, // Get up to 5 gifs for randomization
+          limit: 30, // Get up to 30 gifs for randomization
           rating: 'g'
         },
         timeout: 5000
