@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+/.pnp
+.pnp.js
+
+# Production Build
+dist/
+
+# Local Environment Variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Databases and Local Storage
+server/db_fallback.json
+server/db_users_fallback.json
+
+# Ignore generated media outputs & caches anywhere in the project
+**/*.mp4
+**/*.gif
+server/public/cache/*
+!server/public/cache/.gitkeep
+server/public/outputs/*
+!server/public/outputs/.gitkeep
+
+# Logs and Caches
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.eslintcache
+
+# OS Files
+.DS_Store
+Thumbs.db

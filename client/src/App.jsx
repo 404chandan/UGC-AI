@@ -415,6 +415,7 @@ export default function App() {
         // Remove typing indicator and load the generated video concept in UI
         setMessages(prev => prev.filter(m => m.id !== typingId));
         loadVideoInUI(data.record);
+        fetchVideos();
       } else {
         // Normal conversational response
         setMessages(prev => {
@@ -490,6 +491,7 @@ export default function App() {
       
       // Load initial chat and widget layout directly from the db
       loadVideoInUI(initialRecord);
+      fetchVideos();
     } catch (err) {
       setMessages(prev => [
         ...prev,

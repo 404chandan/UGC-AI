@@ -158,11 +158,12 @@ export async function getBackgroundVideo(keywords, vibe) {
 
       const videos = response.data.videos;
       if (videos && videos.length > 0) {
-        // Find best video file (prefer vertical, HD quality)
-        const video = videos[0];
+        // Pick a random video from the search results to keep generation dynamic!
+        const randomIndex = Math.floor(Math.random() * videos.length);
+        const video = videos[randomIndex];
         const file = video.video_files.find(f => f.width < f.height) || video.video_files[0];
         videoUrl = file.link;
-        console.log(`[Assets] Found video on Pexels: ${videoUrl}`);
+        console.log(`[Assets] Found video on Pexels (index ${randomIndex}/${videos.length}): ${videoUrl}`);
       }
     } catch (err) {
       console.error('[Assets] Pexels search failed:', err.message);
@@ -174,13 +175,20 @@ export async function getBackgroundVideo(keywords, vibe) {
     console.log('[Assets] Using curated fallback background video...');
     const searchTerms = (keywords || []).map(k => k.toLowerCase()).join(' ');
     
-    // Attempt to match keywords
-    const matched = FALLBACK_VIDEOS.find(video => 
+    // Filter matching fallbacks
+    const matchedVideos = FALLBACK_VIDEOS.filter(video => 
       video.keywords.some(kw => searchTerms.includes(kw))
     );
     
-    // Choose the matched fallback or a random one
-    videoUrl = matched ? matched.url : FALLBACK_VIDEOS[4].url; // abstract loop default
+    if (matchedVideos.length > 0) {
+      // Pick a random matching fallback video
+      const randomIndex = Math.floor(Math.random() * matchedVideos.length);
+      videoUrl = matchedVideos[randomIndex].url;
+    } else {
+      // Pick a random fallback video from all options to keep it diverse
+      const randomIndex = Math.floor(Math.random() * FALLBACK_VIDEOS.length);
+      videoUrl = FALLBACK_VIDEOS[randomIndex].url;
+    }
     console.log(`[Assets] Selected fallback video url: ${videoUrl}`);
   }
 
@@ -231,7 +239,7 @@ export async function getOverlayGIF(keywords) {
         params: {
           api_key: giphyKey,
           q: query,
-          limit: 3,
+          limit: 5, // Get up to 5 gifs for randomization
           rating: 'g'
         },
         timeout: 5000
@@ -239,9 +247,11 @@ export async function getOverlayGIF(keywords) {
 
       const gifs = response.data.data;
       if (gifs && gifs.length > 0) {
-        // Get the downsized GIF URL to optimize download speed & memory
-        gifUrl = gifs[0].images.downsized.url || gifs[0].images.original.url;
-        console.log(`[Assets] Found Giphy GIF: ${gifUrl}`);
+        // Pick a random GIF from the search results to keep overlays unique!
+        const randomIndex = Math.floor(Math.random() * gifs.length);
+        const selectedGif = gifs[randomIndex];
+        gifUrl = selectedGif.images.downsized.url || selectedGif.images.original.url;
+        console.log(`[Assets] Found Giphy GIF (index ${randomIndex}/${gifs.length}): ${gifUrl}`);
       }
     } catch (err) {
       console.error('[Assets] Giphy search failed:', err.message);
@@ -264,8 +274,10 @@ export async function getOverlayGIF(keywords) {
     } else if (searchTerms.includes('type') || searchTerms.includes('code') || searchTerms.includes('fast')) {
       gifUrl = FALLBACK_GIFS.typing_fast;
     } else {
-      // Default to dancing cat because it's funny and fits almost everything
-      gifUrl = FALLBACK_GIFS.dancing_cat;
+      // Pick a random fallback GIF from all options
+      const gifValues = Object.values(FALLBACK_GIFS);
+      const randomIndex = Math.floor(Math.random() * gifValues.length);
+      gifUrl = gifValues[randomIndex];
     }
     console.log(`[Assets] Selected fallback GIF url: ${gifUrl}`);
   }
