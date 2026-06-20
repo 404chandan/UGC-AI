@@ -11,6 +11,7 @@ import {
   Loader2, 
   AlertCircle,
   Play,
+  Pause,
   Volume2,
   Plus,
   Trash2,
@@ -33,6 +34,7 @@ export default function App() {
   const [pitchInput, setPitchInput] = useState('');
   const [urlInput, setUrlInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isPollingPaused, setIsPollingPaused] = useState(false);
   const [activePollId, setActivePollId] = useState(null);
   const [currentProgress, setCurrentProgress] = useState(null);
 
@@ -203,6 +205,7 @@ export default function App() {
   const loadVideoInUI = (video) => {
     if (!video) {
       setSelectedVideo(null);
+      setIsPollingPaused(false);
       setMessages([
         {
           id: 'welcome',
@@ -215,6 +218,7 @@ export default function App() {
     }
     
     setSelectedVideo(video);
+    setIsPollingPaused(false);
     
     // Read saved chat history or use legacy fallback
     if (video.chatHistory && video.chatHistory.length > 0) {
@@ -315,7 +319,9 @@ export default function App() {
 
     if (status === 'failed') return 'failed';
     if (currentIdx > targetIdx) return 'completed';
-    if (currentIdx === targetIdx) return 'active';
+    if (currentIdx === targetIdx) {
+      return isPollingPaused ? 'paused' : 'active';
+    }
     return 'pending';
   };
 
@@ -324,6 +330,7 @@ export default function App() {
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     setActivePollId(id);
     setIsGenerating(true);
+    setIsPollingPaused(false);
 
     pollIntervalRef.current = setInterval(async () => {
       try {
@@ -363,6 +370,19 @@ export default function App() {
         setCurrentProgress(null);
       }
     }, 2000);
+  };
+
+  // Toggle generation polling (pause/resume in chat interface)
+  const handleTogglePolling = (id) => {
+    if (isGenerating && !isPollingPaused) {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      setIsGenerating(false);
+      setIsPollingPaused(true);
+      console.log(`[Chat] Paused video generation polling for record: ${id}`);
+    } else {
+      startPolling(id);
+      console.log(`[Chat] Resumed video generation polling for record: ${id}`);
+    }
   };
 
   const handleKeyDown = (e) => {
@@ -742,6 +762,20 @@ export default function App() {
                   {/* Status Steps Widget */}
                   {msg.isWidget && (
                     <div className="status-widget">
+                      <div className="status-widget-header">
+                        <span className="status-widget-title">Production Status</span>
+                        {(msg.videoRecordId === activePollId || (selectedVideo && selectedVideo._id === msg.videoRecordId && (selectedVideo.status !== 'completed' && selectedVideo.status !== 'failed'))) && (
+                          <button 
+                            type="button"
+                            onClick={() => handleTogglePolling(msg.videoRecordId)}
+                            className="status-toggle-btn"
+                            title={isGenerating && !isPollingPaused ? "Pause generation updates" : "Resume generation updates"}
+                          >
+                            {isGenerating && !isPollingPaused ? <Pause size={10} /> : <Play size={10} />}
+                            <span>{isGenerating && !isPollingPaused ? "Pause" : "Resume"}</span>
+                          </button>
+                        )}
+                      </div>
                       
                       <div className={`status-step ${getStepStatus(msg.status, 'scraping')}`}>
                         <div className="status-indicator" />

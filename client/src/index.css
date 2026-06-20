@@ -1068,3 +1068,52 @@ body {
   box-shadow: 0 0 10px rgba(244, 63, 94, 0.15);
 }
 
+/* Status Widget Pause/Resume Toggle & Paused Step Styling */
+.status-widget-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+}
+
+.status-widget-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.status-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.status-toggle-btn:hover {
+  background: rgba(168, 85, 247, 0.12);
+  border-color: rgba(168, 85, 247, 0.4);
+  color: var(--text-primary);
+}
+
+.status-step.paused {
+  color: #f59e0b; /* Amber warning text for paused state */
+  font-weight: 500;
+}
+
+.status-step.paused .status-indicator {
+  background: #f59e0b;
+  box-shadow: 0 0 8px #f59e0b;
+  animation: none; /* Stop the pulsing animation when paused */
+}
+
