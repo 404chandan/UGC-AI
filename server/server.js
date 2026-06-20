@@ -18,7 +18,7 @@ import {
   deleteVideoRecord
 } from './videoModel.js';
 import { scrapeWebsite } from './scraper.js';
-import { planUGCContent, chatWithDirector } from './gemini.js';
+import { planUGCContent, chatWithDirector, validateMarketingPitch } from './gemini.js';
 import { 
   getBackgroundVideo, 
   getOverlayGIF, 
@@ -275,6 +275,12 @@ app.post('/api/generate', authenticateToken, async (req, res) => {
   }
 
   try {
+    // Validate that the description/url makes sense for a marketing pitch/url
+    const validation = await validateMarketingPitch(description, url);
+    if (!validation.isValid) {
+      return res.status(400).json({ error: validation.reason });
+    }
+
     const tempTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     
     // Create initial chat history structured context
@@ -282,7 +288,7 @@ app.post('/api/generate', authenticateToken, async (req, res) => {
       {
         id: 'welcome',
         sender: 'bot',
-        text: "Hey! 🎬 I'm your UGC video copywriter and editor. Give me a pitch and a website link, and I will write Gen-Z style copy, grab stock footage & reaction GIFs, mix trending audio, and compile a viral 9:16 short for you in seconds! 🚀",
+        text: "Hey! 🎬 I am UGC Chat. Describe your product pitch or share a website link, and chat with me to write Gen-Z copy, grab stock footage/reaction GIFs, mix trending audio, and generate viral 9:16 shorts with me! 🚀",
         time: tempTime
       },
       {
@@ -344,11 +350,25 @@ app.post('/api/chat', authenticateToken, async (req, res) => {
       const description = chatResult.description || message;
       const url = chatResult.url || '';
 
+      // Validate that it makes sense for a marketing pitch/url
+      const validation = await validateMarketingPitch(description, url);
+      if (!validation.isValid) {
+        // Override generation request to conversational, replying with validation reason
+        chatResult.isGenerationRequest = false;
+        chatResult.reply = validation.reason;
+      }
+    }
+
+    if (chatResult.isGenerationRequest) {
+      // 1. Trigger Video Generation Pipeline
+      const description = chatResult.description || message;
+      const url = chatResult.url || '';
+
       const initialChat = [
         {
           id: 'welcome',
           sender: 'bot',
-          text: "Hey! 🎬 I'm your UGC video copywriter and editor. Give me a pitch and a website link, and I will write Gen-Z style copy, grab stock footage & reaction GIFs, mix trending audio, and compile a viral 9:16 short for you in seconds! 🚀",
+          text: "Hey! 🎬 I am UGC Chat. Describe your product pitch or share a website link, and chat with me to write Gen-Z copy, grab stock footage/reaction GIFs, mix trending audio, and generate viral 9:16 shorts with me! 🚀",
           time: tempTime
         },
         // We put the previous conversational messages, followed by the generation start

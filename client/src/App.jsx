@@ -26,7 +26,7 @@ export default function App() {
     {
       id: 'welcome',
       sender: 'bot',
-      text: "Hey! 🎬 I'm your UGC video copywriter and editor. Give me a pitch and a website link, and I will write Gen-Z style copy, grab stock footage & reaction GIFs, mix trending audio, and compile a viral 9:16 short for you in seconds! 🚀",
+      text: "Hey! 🎬 I am UGC Chat. Describe your product pitch or share a website link, and chat with me to write Gen-Z copy, grab stock footage/reaction GIFs, mix trending audio, and generate viral 9:16 shorts with me! 🚀",
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
   ]);
@@ -121,7 +121,7 @@ export default function App() {
       {
         id: 'welcome',
         sender: 'bot',
-        text: "Hey! 🎬 I'm your UGC video copywriter and editor. Give me a pitch and a website link, and I will write Gen-Z style copy, grab stock footage & reaction GIFs, mix trending audio, and compile a viral 9:16 short for you in seconds! 🚀",
+        text: "Hey! 🎬 I am UGC Chat. Describe your product pitch or share a website link, and chat with me to write Gen-Z copy, grab stock footage/reaction GIFs, mix trending audio, and generate viral 9:16 shorts with me! 🚀",
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }
     ]);
@@ -134,7 +134,7 @@ export default function App() {
       {
         id: 'welcome',
         sender: 'bot',
-        text: "Hey! 🎬 I'm your UGC video copywriter and editor. Give me a pitch and a website link, and I will write Gen-Z style copy, grab stock footage & reaction GIFs, mix trending audio, and compile a viral 9:16 short for you in seconds! 🚀",
+        text: "Hey! 🎬 I am UGC Chat. Describe your product pitch or share a website link, and chat with me to write Gen-Z copy, grab stock footage/reaction GIFs, mix trending audio, and generate viral 9:16 shorts with me! 🚀",
         time: timeStr
       },
       {
@@ -206,7 +206,7 @@ export default function App() {
         {
           id: 'welcome',
           sender: 'bot',
-          text: "Hey! 🎬 I'm your UGC video copywriter and editor. Give me a pitch and a website link, and I will write Gen-Z style copy, grab stock footage & reaction GIFs, mix trending audio, and compile a viral 9:16 short for you in seconds! 🚀",
+          text: "Hey! 🎬 I am UGC Chat. Describe your product pitch or share a website link, and chat with me to write Gen-Z copy, grab stock footage/reaction GIFs, mix trending audio, and generate viral 9:16 shorts with me! 🚀",
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         }
       ]);
@@ -343,6 +343,15 @@ export default function App() {
     }, 2000);
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (pitchInput.trim() && !isGenerating) {
+        handleSendMessage(e);
+      }
+    }
+  };
+
   // Submit message to conversational chatbot
   const handleSendMessage = async (e) => {
     if (e && typeof e.preventDefault === 'function') {
@@ -473,7 +482,8 @@ export default function App() {
       }
 
       if (!response.ok) {
-        throw new Error('Failed to schedule video rendering');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to schedule video rendering');
       }
 
       const initialRecord = await response.json();
@@ -755,6 +765,7 @@ export default function App() {
               <textarea
                 value={pitchInput}
                 onChange={e => setPitchInput(e.target.value)}
+                onKeyDown={handleKeyDown}
                 placeholder="Chat with UGC Director or describe your product pitch..."
                 className="chat-textarea"
                 required

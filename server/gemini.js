@@ -388,3 +388,120 @@ function getMockChatResponse(message, chatHistory) {
     reply: reply
   };
 }
+
+/**
+ * Local heuristic validation to verify if description and/or url make sense.
+ * @param {string} desc
+ * @param {string} u
+ * @returns {{ isValid: boolean, reason: string }}
+ */
+function runHeuristicValidation(desc, u) {
+  if (!desc && !u) {
+    return { isValid: false, reason: "Product description or website URL is required." };
+  }
+  if (u && !u.includes('.')) {
+    return { isValid: false, reason: "Please provide a valid website URL." };
+  }
+  
+  // If there's no URL, we require a description of at least 5 characters
+  if (!u) {
+    if (desc.length < 5) {
+      return { isValid: false, reason: "The description is too short to be a valid product pitch." };
+    }
+    const lower = desc.toLowerCase().trim();
+    const useless = ['hi', 'hello', 'hey', 'test', 'asdf', 'yes', 'no', 'ok', 'okay', 'generate', 'video', 'generate video', 'make video'];
+    if (useless.includes(lower) || lower.length < 3) {
+      return { isValid: false, reason: "Please specify a product or service you want to create a video for." };
+    }
+  } else {
+    // If there is a URL, but also a description, check if the description is a useless word
+    if (desc) {
+      const lower = desc.toLowerCase().trim();
+      const useless = ['hi', 'hello', 'hey', 'test', 'asdf', 'yes', 'no', 'ok', 'okay', 'generate', 'video', 'generate video', 'make video'];
+      if (useless.includes(lower)) {
+        return { isValid: false, reason: "Please specify a product or service you want to create a video for." };
+      }
+    }
+  }
+  
+  return { isValid: true, reason: "" };
+}
+
+
+/**
+ * Validates if the given description and/or url make sense for a marketing pitch or product URL.
+ * @param {string} description
+ * @param {string} url
+ * @returns {Promise<{ isValid: boolean, reason: string }>}
+ */
+export async function validateMarketingPitch(description, url) {
+  const desc = (description || '').trim();
+  const u = (url || '').trim();
+
+  // 1. Run local heuristic check first to filter out obvious junk/gibberish instantly
+  const heuristicResult = runHeuristicValidation(desc, u);
+  if (!heuristicResult.isValid) {
+    return heuristicResult;
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return heuristicResult;
+  }
+
+  console.log('[Gemini] Validating marketing pitch...');
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+  const prompt = `
+You are an expert marketing reviewer. Your task is to analyze a proposed video generation request and determine if it contains a valid, sensible product description/pitch or a valid website URL that can be used to generate a marketing video.
+
+Input Pitch Description:
+"${desc || '(None)'}"
+
+Input Website URL:
+"${u || '(None)'}"
+
+A request does NOT make sense if:
+- It is just generic greetings (e.g. "hi", "hello")
+- It is gibberish, keyboard mashing (e.g. "asdf", "qwerty")
+- It is just single generic words that don't specify any product or service (e.g. "test", "yes", "generate", "video")
+- The URL is invalid or placeholder (e.g. "google", "none", "http")
+
+A request DOES make sense if:
+- It describes a product, app, service, store, brand, startup, or feature (even if brief, e.g. "sunrise alarm clock", "skincare brand for teens", "a mobile app to track habits").
+- Or it provides a valid-looking website URL to scrape (e.g. "https://myproduct.com", "example.org").
+
+Generate a structured JSON output with the following fields:
+- isValid: boolean (true if it makes sense to generate a marketing video for this input, false otherwise)
+- reason: string (if isValid is false, a polite, short feedback message telling the user what kind of input is expected)
+`;
+
+  try {
+    const responseSchema = {
+      type: "object",
+      properties: {
+        isValid: { type: "boolean" },
+        reason: { type: "string" }
+      },
+      required: ["isValid", "reason"]
+    };
+
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: responseSchema,
+        temperature: 0.1
+      }
+    });
+
+    const responseText = result.response.text();
+    console.log('[Gemini] Pitch validation result:', responseText);
+    return JSON.parse(responseText);
+  } catch (error) {
+    console.error('[Gemini] Pitch validation failed, defaulting to heuristic result:', error);
+    return heuristicResult;
+  }
+}
+
