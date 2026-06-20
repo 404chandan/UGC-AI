@@ -343,9 +343,111 @@ export default function App() {
     }, 2000);
   };
 
+  // Submit message to conversational chatbot
+  const handleSendMessage = async (e) => {
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+    }
+    if (!pitchInput.trim() || isGenerating) return;
+
+    const text = pitchInput.trim();
+    const url = urlInput;
+    setPitchInput('');
+
+    const userMsg = {
+      id: `user-${Date.now()}`,
+      sender: 'user',
+      text: text,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    // Append user message locally
+    setMessages(prev => [...prev, userMsg]);
+
+    // Show temporary typing indicator
+    const typingId = `typing-${Date.now()}`;
+    setMessages(prev => [
+      ...prev,
+      {
+        id: typingId,
+        sender: 'bot',
+        text: 'Typing...',
+        isTyping: true,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+    ]);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          message: text,
+          videoId: selectedVideo ? selectedVideo._id : null,
+          chatHistory: messages.concat(userMsg)
+        })
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        handleLogout();
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error('Failed to get chat response');
+      }
+
+      const data = await res.json();
+
+      if (data.action === 'generate') {
+        // Remove typing indicator and load the generated video concept in UI
+        setMessages(prev => prev.filter(m => m.id !== typingId));
+        loadVideoInUI(data.record);
+      } else {
+        // Normal conversational response
+        setMessages(prev => {
+          const filtered = prev.filter(m => m.id !== typingId);
+          return [
+            ...filtered,
+            {
+              id: `bot-${Date.now()}`,
+              sender: 'bot',
+              text: data.responseText,
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            }
+          ];
+        });
+
+        if (data.updatedVideo) {
+          setSelectedVideo(data.updatedVideo);
+          fetchVideos();
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      setMessages(prev => {
+        const filtered = prev.filter(m => m.id !== typingId);
+        return [
+          ...filtered,
+          {
+            id: `err-${Date.now()}`,
+            sender: 'bot',
+            text: `Oops, chat assistant is offline: ${err.message}`,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }
+        ];
+      });
+    }
+  };
+
   // Submit new generation request
   const handleGenerate = async (e) => {
-    e.preventDefault();
+    if (e && typeof e.preventDefault === 'function') {
+      e.preventDefault();
+    }
     if (!pitchInput.trim() || isGenerating) return;
 
     const description = pitchInput;
@@ -591,7 +693,15 @@ export default function App() {
                   {msg.sender === 'user' ? 'Me' : 'UGC Director'}
                 </div>
                 <div className="message-bubble">
-                  <div style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</div>
+                  {msg.isTyping ? (
+                    <div className="typing-indicator-dots">
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                    </div>
+                  ) : (
+                    <div style={{ whiteSpace: 'pre-wrap' }}>{msg.text}</div>
+                  )}
                   
                   {/* Status Steps Widget */}
                   {msg.isWidget && (
@@ -641,11 +751,11 @@ export default function App() {
 
           {/* Form input */}
           <div className="chat-input-bar">
-            <form onSubmit={handleGenerate} className="chat-input-form">
+            <form onSubmit={handleSendMessage} className="chat-input-form">
               <textarea
                 value={pitchInput}
                 onChange={e => setPitchInput(e.target.value)}
-                placeholder="Pitch your product... (e.g. A lo-fi alarm clock that simulates sunrise and plays soft bird sounds)"
+                placeholder="Chat with UGC Director or describe your product pitch..."
                 className="chat-textarea"
                 required
                 disabled={isGenerating}
@@ -660,23 +770,34 @@ export default function App() {
                   className="chat-url-input"
                   disabled={isGenerating}
                 />
-                <button 
-                  type="submit" 
-                  className="submit-btn"
-                  disabled={isGenerating || !pitchInput.trim()}
-                >
-                  {isGenerating ? (
-                    <>
-                      <Loader2 size={16} className="spinner" />
-                      <span>Editing...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles size={16} />
-                      <span>Produce Video</span>
-                    </>
-                  )}
-                </button>
+                <div className="chat-actions-group">
+                  <button 
+                    type="submit" 
+                    className="chat-send-btn"
+                    disabled={isGenerating || !pitchInput.trim()}
+                  >
+                    <Send size={15} />
+                    <span>Send</span>
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={handleGenerate}
+                    className="submit-btn"
+                    disabled={isGenerating || !pitchInput.trim()}
+                  >
+                    {isGenerating ? (
+                      <>
+                        <Loader2 size={15} className="spinner" />
+                        <span>Producing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={15} />
+                        <span>Produce Video</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </form>
           </div>

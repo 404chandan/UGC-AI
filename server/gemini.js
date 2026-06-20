@@ -246,3 +246,145 @@ function getMockContent(description) {
     audioVibe: audio
   };
 }
+
+/**
+ * Chats with the UGC Director AI assistant.
+ * Analyzes the user's message to decide if it's an explicit request to generate a video.
+ * If so, extracts the description/url. Otherwise, returns a conversational reply.
+ * @param {string} message - User's chat message
+ * @param {array} chatHistory - Array of past messages
+ * @returns {Promise<object>} Response containing isGenerationRequest, description, url, reply
+ */
+export async function chatWithDirector(message, chatHistory = []) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.warn('[Gemini] GEMINI_API_KEY is missing! Using mock chat agent.');
+    return getMockChatResponse(message, chatHistory);
+  }
+
+  console.log('[Gemini] Conversational chat query with UGC Director...');
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+  // Format past history for Gemini context if available
+  const historyText = chatHistory
+    .filter(m => !m.isWidget && !m.isTyping) // exclude system widgets or typing indicators
+    .map(m => `${m.sender === 'user' ? 'User' : 'UGC Director'}: ${m.text}`)
+    .join('\n');
+
+  const prompt = `
+You are the "UGC Director", a viral short-form video copywriter, video editor, and expert social media director.
+You are chatting with a user who is building video marketing content. Keep your tone helpful, creative, friendly, and Gen-Z savvy (using emojis, trendy vibe, but professional when explaining video metrics or workflows).
+
+Your goal is to converse naturally with the user. Answer questions about UGC videos, how the tool works, video marketing tips, or just greet them.
+
+HOWEVER, you must also detect if the user's latest message is an EXPLICIT request to generate or produce a video for a product or service.
+For example:
+- "make a video for sunrise alarm clock" -> isGenerationRequest: true
+- "generate a reel for my skincare brand" -> isGenerationRequest: true
+- "need a short for this website: http://example.com" -> isGenerationRequest: true
+- "hi" -> isGenerationRequest: false
+- "tell me about what you do" -> isGenerationRequest: false
+- "what kind of hooks work best?" -> isGenerationRequest: false
+
+Latest User Message:
+"${message}"
+
+Recent Conversation History:
+${historyText || "(No history)"}
+
+Generate a structured JSON output according to the provided schema.
+`;
+
+  try {
+    const chatResponseSchema = {
+      type: "object",
+      properties: {
+        isGenerationRequest: { 
+          type: "boolean", 
+          description: "true if the user is explicitly requesting to generate/produce/create a video now." 
+        },
+        description: { 
+          type: "string", 
+          description: "If isGenerationRequest is true, extract the product description/pitch to use for generation. Otherwise, leave empty." 
+        },
+        url: { 
+          type: "string", 
+          description: "If isGenerationRequest is true and the user provided a URL, extract it. Otherwise, leave empty." 
+        },
+        reply: { 
+          type: "string", 
+          description: "If isGenerationRequest is false, your natural conversational reply. If isGenerationRequest is true, a short, excited response confirming you're starting the video generator now (e.g. 'OMG yes! Generating that video for you right now... 🚀')." 
+        }
+      },
+      required: ["isGenerationRequest", "description", "url", "reply"]
+    };
+
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: chatResponseSchema,
+        temperature: 0.7
+      }
+    });
+
+    const responseText = result.response.text();
+    console.log('[Gemini] Chat agent response:', responseText);
+    return JSON.parse(responseText);
+  } catch (error) {
+    console.error('[Gemini] Chat agent failed:', error);
+    return getMockChatResponse(message, chatHistory);
+  }
+}
+
+/**
+ * Mock conversational responses if GEMINI_API_KEY is not set
+ */
+function getMockChatResponse(message, chatHistory) {
+  const cleanMsg = message.toLowerCase().trim();
+
+  // Rules-based classifier for generation requests
+  const generateWords = ['generate', 'make', 'create', 'produce', 'render', 'build', 'video for', 'short for', 'need a video'];
+  const isGenRequest = generateWords.some(word => cleanMsg.includes(word)) && cleanMsg.length > 8;
+
+  if (isGenRequest) {
+    // Attempt to extract product name/description
+    let desc = message;
+    generateWords.forEach(w => {
+      desc = desc.replace(new RegExp(w, 'gi'), '');
+    });
+    desc = desc.replace(/please/gi, '').replace(/about/gi, '').replace(/for/gi, '').trim();
+    if (!desc) desc = "A cool product";
+
+    // Attempt to extract URL
+    const urlMatch = message.match(/(https?:\/\/[^\s]+)/i);
+    const url = urlMatch ? urlMatch[1] : '';
+
+    return {
+      isGenerationRequest: true,
+      description: desc,
+      url: url,
+      reply: `Got it! Let's generate a video for "${desc}" right away! 🎬🚀`
+    };
+  }
+
+  // Conversational response options
+  let reply = '';
+  if (cleanMsg === 'hi' || cleanMsg === 'hello' || cleanMsg === 'hey') {
+    reply = "Hey! 🎬 UGC Director here. Ready to write some viral hooks, find stock footage, and compile a premium short-form video? Just paste a product description/website, or click 'Produce Video' to start!";
+  } else if (cleanMsg.includes('what can you do') || cleanMsg.includes('help') || cleanMsg.includes('features')) {
+    reply = "I can generate UGC videos for you! Just send me a product URL and I'll create an engaging short-form marketing video complete with stock loops, transparent text overlays, viral reaction GIFs, and audio vibes! 🎥📈";
+  } else if (cleanMsg.includes('hook') || cleanMsg.includes('viral')) {
+    reply = "Viral hooks need to be self-aware and Gen-Z focused! E.g. 'POV: you finally stopped doing X 👀'. I write these dynamically to hook viewers in the first 3 seconds!";
+  } else {
+    reply = `I hear you! I'm your virtual UGC director. If you'd like to build a video, just click 'Produce Video' or ask me directly like "Make a video for [your product name]"!`;
+  }
+
+  return {
+    isGenerationRequest: false,
+    description: '',
+    url: '',
+    reply: reply
+  };
+}

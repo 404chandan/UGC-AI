@@ -14,10 +14,11 @@ import {
   getVideos, 
   getVideoById, 
   updateVideoStatus,
+  updateVideoChatHistory,
   deleteVideoRecord
 } from './videoModel.js';
 import { scrapeWebsite } from './scraper.js';
-import { planUGCContent } from './gemini.js';
+import { planUGCContent, chatWithDirector } from './gemini.js';
 import { 
   getBackgroundVideo, 
   getOverlayGIF, 
@@ -320,6 +321,112 @@ app.post('/api/generate', authenticateToken, async (req, res) => {
     runVideoGenerationPipeline(recordId, description, url);
 
     res.status(202).json(record);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Conversational chat with the UGC Director (scoped to owner)
+app.post('/api/chat', authenticateToken, async (req, res) => {
+  const { message, videoId, chatHistory } = req.body;
+  if (!message || !message.trim()) {
+    return res.status(400).json({ error: 'Message is required' });
+  }
+
+  try {
+    const tempTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // Call Gemini to decide if this is a video generation request or conversation
+    const chatResult = await chatWithDirector(message, chatHistory || []);
+
+    if (chatResult.isGenerationRequest) {
+      // 1. Trigger Video Generation Pipeline
+      const description = chatResult.description || message;
+      const url = chatResult.url || '';
+
+      const initialChat = [
+        {
+          id: 'welcome',
+          sender: 'bot',
+          text: "Hey! 🎬 I'm your UGC video copywriter and editor. Give me a pitch and a website link, and I will write Gen-Z style copy, grab stock footage & reaction GIFs, mix trending audio, and compile a viral 9:16 short for you in seconds! 🚀",
+          time: tempTime
+        },
+        // We put the previous conversational messages, followed by the generation start
+        ...(chatHistory || []).filter(m => m.id !== 'welcome' && !m.isTyping),
+        {
+          id: `bot-excited-${Date.now()}`,
+          sender: 'bot',
+          text: chatResult.reply || "OMG yes, let's make a video for that right now! 🎬🚀",
+          time: tempTime
+        },
+        {
+          id: `widget-${Date.now()}`,
+          sender: 'bot',
+          text: `Starting assets collection and layout assembly for your product...`,
+          isWidget: true,
+          videoRecordId: null, // linked below
+          status: 'scraping',
+          time: tempTime
+        }
+      ];
+
+      // Create record
+      const record = await createVideoRecord({
+        userId: req.user.id,
+        productDescription: description,
+        websiteUrl: url,
+        status: 'scraping',
+        chatHistory: initialChat
+      });
+
+      const recordId = record._id.toString();
+      initialChat[initialChat.length - 1].videoRecordId = recordId;
+      const updatedRecord = await updateVideoStatus(recordId, 'scraping', { chatHistory: initialChat });
+
+      // Run background pipeline
+      runVideoGenerationPipeline(recordId, description, url);
+
+      return res.status(202).json({
+        action: 'generate',
+        record: updatedRecord
+      });
+    } else {
+      // 2. Normal Conversational Chat response
+      let updatedVideo = null;
+      if (videoId) {
+        // Scoped to active video, save in history
+        const record = await getVideoById(videoId);
+        if (record && record.userId === req.user.id) {
+          const currentHistory = record.chatHistory || [];
+          
+          // Append user message and bot response
+          const nextHistory = [
+            ...currentHistory,
+            {
+              id: `user-${Date.now()}`,
+              sender: 'user',
+              text: message,
+              time: tempTime
+            },
+            {
+              id: `bot-${Date.now()}`,
+              sender: 'bot',
+              text: chatResult.reply,
+              time: tempTime
+            }
+          ];
+
+          // Save record with updated chatHistory
+          updatedVideo = await updateVideoChatHistory(videoId, nextHistory);
+        }
+      }
+
+      return res.json({
+        action: 'chat',
+        responseText: chatResult.reply,
+        updatedVideo
+      });
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

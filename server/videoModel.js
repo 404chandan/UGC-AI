@@ -150,6 +150,22 @@ export async function updateVideoStatus(id, status, details = {}) {
   }
 }
 
+export async function updateVideoChatHistory(id, chatHistory) {
+  const record = await getVideoById(id);
+  if (!record) return null;
+  
+  if (isFallbackDB) {
+    return await fallbackDB.updateStatus(id, record.status, { chatHistory });
+  } else {
+    const mongoRecord = await MongoVideo.findById(id);
+    if (!mongoRecord) return null;
+    mongoRecord.chatHistory = chatHistory;
+    mongoRecord.updatedAt = new Date();
+    await mongoRecord.save();
+    return mongoRecord;
+  }
+}
+
 export async function deleteVideoRecord(id) {
   if (isFallbackDB) {
     return await fallbackDB.delete(id);
