@@ -8,8 +8,8 @@ const VideoSchema = new mongoose.Schema({
   websiteUrl: { type: String, default: '' },
   status: { 
     type: String, 
-    enum: ['scraping', 'planning', 'downloading', 'rendering', 'completed', 'failed'], 
-    default: 'scraping' 
+    enum: ['chatting', 'scraping', 'planning', 'downloading', 'rendering', 'completed', 'failed'], 
+    default: 'chatting' 
   },
   isPaused: { type: Boolean, default: false },
   error: { type: String, default: '' },

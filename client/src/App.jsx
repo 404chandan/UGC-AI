@@ -228,7 +228,7 @@ export default function App() {
     }
 
     // Check if background task is still rendering and we need to poll
-    const isFinished = video.status === 'completed' || video.status === 'failed';
+    const isFinished = video.status === 'completed' || video.status === 'failed' || video.status === 'chatting';
     if (!isFinished) {
       if (video.isPaused) {
         setIsPollingPaused(true);
@@ -547,7 +547,7 @@ export default function App() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ description, url })
+        body: JSON.stringify({ description, url, videoId: selectedVideo ? selectedVideo._id : null })
       });
 
       if (response.status === 401 || response.status === 403) {
@@ -719,7 +719,7 @@ export default function App() {
                 >
                   <div className="history-card-header">
                     <div className="history-card-title">
-                      {vid.productName || 'Analyzing Idea...'}
+                      {vid.productName || (vid.status === 'chatting' ? 'Chat Draft' : 'Analyzing Idea...')}
                     </div>
                     <button 
                       onClick={(e) => handleDeleteVideo(e, vid._id)}

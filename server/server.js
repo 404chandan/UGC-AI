@@ -307,7 +307,7 @@ app.post('/api/videos/:id/toggle-pause', authenticateToken, async (req, res) => 
 
 // Trigger new video generation (scoped to owner)
 app.post('/api/generate', authenticateToken, async (req, res) => {
-  const { description, url } = req.body;
+  const { description, url, videoId } = req.body;
   if (!description || !description.trim()) {
     return res.status(400).json({ error: 'Product description is required' });
   }
@@ -321,46 +321,84 @@ app.post('/api/generate', authenticateToken, async (req, res) => {
 
     const tempTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     
-    // Create initial chat history structured context
-    const initialChat = [
-      {
-        id: 'welcome',
-        sender: 'bot',
-        text: "Hey! 🎬 I am UGC Chat. Describe your product pitch or share a website link, and chat with me to write Gen-Z copy, grab stock footage/reaction GIFs, mix trending audio, and generate viral 9:16 shorts with me! 🚀",
-        time: tempTime
-      },
-      {
-        id: `user-${Date.now()}`,
-        sender: 'user',
-        text: `Pitch: "${description}"${url ? `\nWebsite: ${url}` : ''}`,
-        time: tempTime
-      },
-      {
-        id: `widget-${Date.now()}`,
-        sender: 'bot',
-        text: `Starting assets collection and layout assembly for your product...`,
-        isWidget: true,
-        videoRecordId: null, // linked below
-        status: 'scraping',
-        time: tempTime
+    let record;
+    if (videoId) {
+      const existing = await getVideoById(videoId);
+      if (existing && existing.userId === req.user.id && existing.status === 'chatting') {
+        record = existing;
       }
-    ];
+    }
 
-    // Create initial record with userId
-    const record = await createVideoRecord({
-      userId: req.user.id,
-      productDescription: description,
-      websiteUrl: url || '',
-      status: 'scraping',
-      chatHistory: initialChat
-    });
+    if (record) {
+      // Upgrade existing chatting record to scraping
+      const initialChat = [
+        ...(record.chatHistory || []).filter(m => m.id !== 'welcome' && !m.isTyping),
+        {
+          id: `user-${Date.now()}`,
+          sender: 'user',
+          text: `Produce video for: "${description}"${url ? `\nWebsite: ${url}` : ''}`,
+          time: tempTime
+        },
+        {
+          id: `widget-${Date.now()}`,
+          sender: 'bot',
+          text: `Starting assets collection and layout assembly for your product...`,
+          isWidget: true,
+          videoRecordId: record._id.toString(),
+          status: 'scraping',
+          time: tempTime
+        }
+      ];
+
+      // Update the record's details
+      record = await updateVideoStatus(record._id.toString(), 'scraping', {
+        productDescription: description,
+        websiteUrl: url || '',
+        chatHistory: initialChat
+      });
+    } else {
+      // Create initial chat history structured context
+      const initialChat = [
+        {
+          id: 'welcome',
+          sender: 'bot',
+          text: "Hey! 🎬 I am UGC Chat. Describe your product pitch or share a website link, and chat with me to write Gen-Z copy, grab stock footage/reaction GIFs, mix trending audio, and generate viral 9:16 shorts with me! 🚀",
+          time: tempTime
+        },
+        {
+          id: `user-${Date.now()}`,
+          sender: 'user',
+          text: `Pitch: "${description}"${url ? `\nWebsite: ${url}` : ''}`,
+          time: tempTime
+        },
+        {
+          id: `widget-${Date.now()}`,
+          sender: 'bot',
+          text: `Starting assets collection and layout assembly for your product...`,
+          isWidget: true,
+          videoRecordId: null, // linked below
+          status: 'scraping',
+          time: tempTime
+        }
+      ];
+
+      // Create initial record with userId
+      record = await createVideoRecord({
+        userId: req.user.id,
+        productDescription: description,
+        websiteUrl: url || '',
+        status: 'scraping',
+        chatHistory: initialChat
+      });
+
+      const recordId = record._id.toString();
+
+      // Link the created record ID to the status widget inside the chatHistory array
+      initialChat[2].videoRecordId = recordId;
+      await updateVideoStatus(recordId, 'scraping', { chatHistory: initialChat });
+    }
 
     const recordId = record._id.toString();
-
-    // Link the created record ID to the status widget inside the chatHistory array
-    initialChat[2].videoRecordId = recordId;
-    await updateVideoStatus(recordId, 'scraping', { chatHistory: initialChat });
-
     // Run pipeline asynchronously so we return HTTP 202 immediately
     runVideoGenerationPipeline(recordId, description, url);
 
@@ -402,6 +440,14 @@ app.post('/api/chat', authenticateToken, async (req, res) => {
       const description = chatResult.description || message;
       const url = chatResult.url || '';
 
+      let record;
+      if (videoId) {
+        const existing = await getVideoById(videoId);
+        if (existing && existing.userId === req.user.id && existing.status === 'chatting') {
+          record = existing;
+        }
+      }
+
       const initialChat = [
         {
           id: 'welcome',
@@ -428,25 +474,36 @@ app.post('/api/chat', authenticateToken, async (req, res) => {
         }
       ];
 
-      // Create record
-      const record = await createVideoRecord({
-        userId: req.user.id,
-        productDescription: description,
-        websiteUrl: url,
-        status: 'scraping',
-        chatHistory: initialChat
-      });
+      if (record) {
+        const recordId = record._id.toString();
+        initialChat[initialChat.length - 1].videoRecordId = recordId;
+        record = await updateVideoStatus(recordId, 'scraping', {
+          productDescription: description,
+          websiteUrl: url,
+          chatHistory: initialChat
+        });
+      } else {
+        // Create record
+        record = await createVideoRecord({
+          userId: req.user.id,
+          productDescription: description,
+          websiteUrl: url,
+          status: 'scraping',
+          chatHistory: initialChat
+        });
 
-      const recordId = record._id.toString();
-      initialChat[initialChat.length - 1].videoRecordId = recordId;
-      const updatedRecord = await updateVideoStatus(recordId, 'scraping', { chatHistory: initialChat });
+        const recordId = record._id.toString();
+        initialChat[initialChat.length - 1].videoRecordId = recordId;
+        record = await updateVideoStatus(recordId, 'scraping', { chatHistory: initialChat });
+      }
 
+      const finalRecordId = record._id.toString();
       // Run background pipeline
-      runVideoGenerationPipeline(recordId, description, url);
+      runVideoGenerationPipeline(finalRecordId, description, url);
 
       return res.status(202).json({
         action: 'generate',
-        record: updatedRecord
+        record: record
       });
     } else {
       // 2. Normal Conversational Chat response
@@ -477,6 +534,36 @@ app.post('/api/chat', authenticateToken, async (req, res) => {
           // Save record with updated chatHistory
           updatedVideo = await updateVideoChatHistory(videoId, nextHistory);
         }
+      } else {
+        // Create a new record to persist the chat session
+        const nextHistory = [
+          ...(chatHistory || []).filter(m => m.id !== 'welcome' && !m.isTyping),
+          {
+            id: `bot-${Date.now()}`,
+            sender: 'bot',
+            text: chatResult.reply,
+            time: tempTime
+          }
+        ];
+
+        // Ensure welcome message is at the start if not present
+        const welcomeExists = nextHistory.some(m => m.id === 'welcome');
+        if (!welcomeExists) {
+          nextHistory.unshift({
+            id: 'welcome',
+            sender: 'bot',
+            text: "Hey! 🎬 I am UGC Chat. Describe your product pitch or share a website link, and chat with me to write Gen-Z copy, grab stock footage/reaction GIFs, mix trending audio, and generate viral 9:16 shorts with me! 🚀",
+            time: tempTime
+          });
+        }
+
+        updatedVideo = await createVideoRecord({
+          userId: req.user.id,
+          productDescription: message,
+          websiteUrl: '',
+          status: 'chatting',
+          chatHistory: nextHistory
+        });
       }
 
       return res.json({

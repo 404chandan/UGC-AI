@@ -16,8 +16,8 @@ export async function planUGCContent(description, scrapedContent) {
   console.log('[Gemini] Planning UGC content with Gemini...');
   const genAI = new GoogleGenerativeAI(apiKey);
   
-  // Use gemini-3.5-flash as the fast, cost-effective default model
-  const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+  // Use gemini-2.5-flash as the fast, cost-effective default model
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
   const prompt = `
 You are a Gen Z UGC (User Generated Content) TikTok & Instagram Reels viral marketing expert.
@@ -296,7 +296,7 @@ export async function chatWithDirector(message, chatHistory = []) {
 
   console.log('[Gemini] Conversational chat query with UGC Director...');
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
   // Format past history for Gemini context if available
   const historyText = chatHistory
