@@ -111,11 +111,9 @@ async function runVideoGenerationPipeline(recordId, description, url) {
     console.log('[Pipeline] Step 3/5: Downloading video and GIF assets...');
     const bgVideoPath = await getBackgroundVideo(concept.bgVideoKeywords, concept.vibe);
     const gifResult = await getOverlayGIF(concept.gifKeywords);
-    // Select a random BGM track on every generation to keep the sound unique and not samey!
-    const audioVibeKeys = Object.keys(AUDIO_TRACKS);
-    const finalAudioVibe = audioVibeKeys[Math.floor(Math.random() * audioVibeKeys.length)];
-
-    const audioTrackConfig = AUDIO_TRACKS[finalAudioVibe] || AUDIO_TRACKS.gonna_fly_now;
+    // Use the AI-planned audio track BGM from the concept plan
+    const plannedAudioVibe = concept.audioVibe || 'gonna_fly_now';
+    const audioTrackConfig = AUDIO_TRACKS[plannedAudioVibe] || AUDIO_TRACKS.gonna_fly_now;
     const audioTrackPath = path.join(AUDIO_DIR, audioTrackConfig.filename);
     
     
