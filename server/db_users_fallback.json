@@ -4,5 +4,11 @@
     "username": "chandan123@examplchandanetestuser.com",
     "passwordHash": "$2b$10$9nfn/QJK4rOIBER5kl78S.pKaiFCS0i5GM/cuZ056nPqIexVtYYca",
     "createdAt": "2026-06-19T17:29:01.111Z"
+  },
+  {
+    "_id": "6a3603e5abb99974238e73af",
+    "username": "testuser_1781924837089",
+    "passwordHash": "$2b$10$Pt7G6OK1j3BDpcutZNk2fuoRgrb8VjVCsQvH1ebgCZBWFhup.8LNe",
+    "createdAt": "2026-06-20T03:07:17.216Z"
   }
 ]

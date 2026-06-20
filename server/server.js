@@ -74,12 +74,27 @@ app.use(express.json());
 // Serve generated videos and audio tracks
 app.use(express.static(PUBLIC_DIR));
 
+// Helper to block pipeline execution if paused by user
+async function checkAndBlockIfPaused(recordId) {
+  while (true) {
+    const record = await getVideoById(recordId);
+    if (!record) {
+      throw new Error('Video generation record was deleted.');
+    }
+    if (!record.isPaused) {
+      break;
+    }
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+}
+
 // Start pipeline in background
 async function runVideoGenerationPipeline(recordId, description, url) {
   try {
     console.log(`[Pipeline] Starting video generation pipeline for record: ${recordId}`);
     
     // Step 1: Website Scraping
+    await checkAndBlockIfPaused(recordId);
     let scrapedText = '';
     if (url && url.trim()) {
       console.log(`[Pipeline] Step 1/5: Scraping site: ${url}`);
@@ -92,6 +107,7 @@ async function runVideoGenerationPipeline(recordId, description, url) {
     // Step 2: Concept Planning with Gemini
     console.log('[Pipeline] Step 2/5: Planning content with Gemini AI...');
     await updateVideoStatus(recordId, 'planning', { extractedText: scrapedText.slice(0, 1000) });
+    await checkAndBlockIfPaused(recordId);
     const concept = await planUGCContent(description, scrapedText);
     
     // Update db with planned content details
@@ -107,6 +123,8 @@ async function runVideoGenerationPipeline(recordId, description, url) {
       audioTrack: concept.audioVibe
     });
 
+    await checkAndBlockIfPaused(recordId);
+
     // Step 3: Asset Retrieval (Video & GIF)
     console.log('[Pipeline] Step 3/5: Downloading video and GIF assets...');
     const bgVideoPath = await getBackgroundVideo(concept.bgVideoKeywords, concept.vibe);
@@ -116,7 +134,6 @@ async function runVideoGenerationPipeline(recordId, description, url) {
     const audioTrackConfig = AUDIO_TRACKS[plannedAudioVibe] || AUDIO_TRACKS.gonna_fly_now;
     const audioTrackPath = path.join(AUDIO_DIR, audioTrackConfig.filename);
     
-    
     if (!fs.existsSync(audioTrackPath)) {
       throw new Error(`Audio track ${audioTrackConfig.filename} was not found on server.`);
     }
@@ -124,6 +141,7 @@ async function runVideoGenerationPipeline(recordId, description, url) {
     // Step 4: Text overlay rendering (using Playwright)
     console.log('[Pipeline] Step 4/5: Generating high-end text caption PNG...');
     await updateVideoStatus(recordId, 'rendering', { gifUrl: gifResult.url });
+    await checkAndBlockIfPaused(recordId);
     
     let captionPngPath = path.join(CACHE_DIR, `caption_${recordId}.png`);
     let hasCaptionPng = true;
@@ -134,6 +152,8 @@ async function runVideoGenerationPipeline(recordId, description, url) {
       captionPngPath = null;
       hasCaptionPng = false;
     }
+
+    await checkAndBlockIfPaused(recordId);
 
     // Step 5: FFmpeg Layer Compositing
     console.log('[Pipeline] Step 5/5: Compositing layers using FFmpeg...');
@@ -257,6 +277,29 @@ app.get('/api/videos/:id', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Access denied: You do not own this video record' });
     }
     res.json(video);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Toggle pause/resume state of a video generation (scoped to owner)
+app.post('/api/videos/:id/toggle-pause', authenticateToken, async (req, res) => {
+  try {
+    const video = await getVideoById(req.params.id);
+    if (!video) {
+      return res.status(404).json({ error: 'Video record not found' });
+    }
+    if (video.userId !== req.user.id) {
+      return res.status(403).json({ error: 'Access denied: You do not own this video record' });
+    }
+
+    const nextPausedState = !video.isPaused;
+    const updatedVideo = await updateVideoStatus(req.params.id, video.status, {
+      isPaused: nextPausedState
+    });
+
+    console.log(`[Server] Toggled pause state for record: ${req.params.id} to: ${nextPausedState}`);
+    res.json(updatedVideo);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

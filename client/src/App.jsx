@@ -230,7 +230,15 @@ export default function App() {
     // Check if background task is still rendering and we need to poll
     const isFinished = video.status === 'completed' || video.status === 'failed';
     if (!isFinished) {
-      startPolling(video._id);
+      if (video.isPaused) {
+        setIsPollingPaused(true);
+        setIsGenerating(false);
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+        }
+      } else {
+        startPolling(video._id);
+      }
     } else {
       // Clear current interval if loading a finished card
       if (pollIntervalRef.current && activePollId !== video._id) {
@@ -320,7 +328,8 @@ export default function App() {
     if (status === 'failed') return 'failed';
     if (currentIdx > targetIdx) return 'completed';
     if (currentIdx === targetIdx) {
-      return isPollingPaused ? 'paused' : 'active';
+      const isPaused = selectedVideo?.isPaused || isPollingPaused;
+      return isPaused ? 'paused' : 'active';
     }
     return 'pending';
   };
@@ -373,15 +382,37 @@ export default function App() {
   };
 
   // Toggle generation polling (pause/resume in chat interface)
-  const handleTogglePolling = (id) => {
-    if (isGenerating && !isPollingPaused) {
-      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-      setIsGenerating(false);
-      setIsPollingPaused(true);
-      console.log(`[Chat] Paused video generation polling for record: ${id}`);
-    } else {
-      startPolling(id);
-      console.log(`[Chat] Resumed video generation polling for record: ${id}`);
+  const handleTogglePolling = async (id) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/videos/${id}/toggle-pause`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.status === 401 || res.status === 403) {
+        handleLogout();
+        return;
+      }
+      if (!res.ok) throw new Error('Failed to toggle pause status');
+      
+      const updatedVideo = await res.json();
+      setSelectedVideo(updatedVideo);
+      fetchVideos();
+      
+      if (updatedVideo.isPaused) {
+        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+        setIsGenerating(false);
+        setIsPollingPaused(true);
+        console.log(`[Chat] Paused video generation for record: ${id}`);
+      } else {
+        startPolling(id);
+        console.log(`[Chat] Resumed video generation for record: ${id}`);
+      }
+    } catch (err) {
+      console.error('Error toggling pause state:', err);
+      alert('Could not toggle pause state: ' + err.message);
     }
   };
 

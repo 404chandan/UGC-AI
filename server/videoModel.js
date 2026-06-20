@@ -11,6 +11,7 @@ const VideoSchema = new mongoose.Schema({
     enum: ['scraping', 'planning', 'downloading', 'rendering', 'completed', 'failed'], 
     default: 'scraping' 
   },
+  isPaused: { type: Boolean, default: false },
   error: { type: String, default: '' },
   extractedText: { type: String, default: '' },
   ugcHooks: { type: [String], default: [] },

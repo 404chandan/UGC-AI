@@ -39,6 +39,91 @@ export const AUDIO_TRACKS = {
     url: 'https://archive.org/download/romanticas90/Celine%20Dion%20-%20My%20Heart%20Will%20Go%20On.mp3',
     filename: 'titanic_sad.mp3',
     title: 'Titanic: My Heart Will Go On'
+  },
+  star_wars: {
+    url: 'https://archive.org/download/London_Philharmonic_Orchestra-cinema_broadway_gold/A1-Star%20Wars.mp3',
+    filename: 'star_wars.mp3',
+    title: 'Star Wars Theme'
+  },
+  rocky_orchestra: {
+    url: 'https://archive.org/download/London_Philharmonic_Orchestra-cinema_broadway_gold/A10-Rocky.mp3',
+    filename: 'rocky_orchestra.mp3',
+    title: 'Rocky Theme (Orchestral)'
+  },
+  grease: {
+    url: 'https://archive.org/download/London_Philharmonic_Orchestra-cinema_broadway_gold/A2-Grease%20Medley.mp3',
+    filename: 'grease.mp3',
+    title: 'Grease Medley'
+  },
+  entertainer: {
+    url: 'https://archive.org/download/London_Philharmonic_Orchestra-cinema_broadway_gold/A3-The%20Entertainer.mp3',
+    filename: 'entertainer.mp3',
+    title: 'The Entertainer'
+  },
+  evergreen: {
+    url: 'https://archive.org/download/London_Philharmonic_Orchestra-cinema_broadway_gold/A4-Evergreen.mp3',
+    filename: 'evergreen.mp3',
+    title: 'Evergreen'
+  },
+  jaws_orchestra: {
+    url: 'https://archive.org/download/London_Philharmonic_Orchestra-cinema_broadway_gold/A5-Jaws.mp3',
+    filename: 'jaws_orchestra.mp3',
+    title: 'Jaws Theme (Orchestral)'
+  },
+  you_light_up: {
+    url: 'https://archive.org/download/London_Philharmonic_Orchestra-cinema_broadway_gold/A6-You%20Light%20Up%20My%20Life.mp3',
+    filename: 'you_light_up.mp3',
+    title: 'You Light Up My Life'
+  },
+  bond_orchestra: {
+    url: 'https://archive.org/download/London_Philharmonic_Orchestra-cinema_broadway_gold/A7-Live%20and%20Let%20Die.mp3',
+    filename: 'bond_orchestra.mp3',
+    title: 'Live and Let Die (James Bond)'
+  },
+  roots: {
+    url: 'https://archive.org/download/London_Philharmonic_Orchestra-cinema_broadway_gold/A8-Roots.mp3',
+    filename: 'roots.mp3',
+    title: 'Roots Theme'
+  },
+  bond_nobody: {
+    url: 'https://archive.org/download/London_Philharmonic_Orchestra-cinema_broadway_gold/A9-Nobody%20Does%20It%20Better.mp3',
+    filename: 'bond_nobody.mp3',
+    title: 'Nobody Does It Better'
+  },
+  saturday_night_fever: {
+    url: 'https://archive.org/download/London_Philharmonic_Orchestra-cinema_broadway_gold/B1-Saturday%20Night%20Fever%20Medley.mp3',
+    filename: 'saturday_night_fever.mp3',
+    title: 'Saturday Night Fever Medley'
+  },
+  way_we_were: {
+    url: 'https://archive.org/download/London_Philharmonic_Orchestra-cinema_broadway_gold/B10-The%20Way%20We%20Were.mp3',
+    filename: 'way_we_were.mp3',
+    title: 'The Way We Were'
+  },
+  sergeant_pepper: {
+    url: 'https://archive.org/download/London_Philharmonic_Orchestra-cinema_broadway_gold/B2-Sergeant%20Pepper%20Medley.mp3',
+    filename: 'sergeant_pepper.mp3',
+    title: 'Sergeant Pepper Medley'
+  },
+  godfather_orchestra: {
+    url: 'https://archive.org/download/London_Philharmonic_Orchestra-cinema_broadway_gold/B3-Love%20Theme%20From%20The%20Godfather.mp3',
+    filename: 'godfather_orchestra.mp3',
+    title: 'Love Theme From The Godfather'
+  },
+  ease_on_down: {
+    url: 'https://archive.org/download/London_Philharmonic_Orchestra-cinema_broadway_gold/B4-Ease%20On%20Down%20The%20Road.mp3',
+    filename: 'ease_on_down.mp3',
+    title: 'Ease On Down The Road'
+  },
+  close_encounters: {
+    url: 'https://archive.org/download/London_Philharmonic_Orchestra-cinema_broadway_gold/B9-Close%20Encounters%20Of%20The%20Third%20Kind.mp3',
+    filename: 'close_encounters.mp3',
+    title: 'Close Encounters Theme'
+  },
+  friends: {
+    url: 'https://archive.org/download/tvtunes_31736/Friends.mp3',
+    filename: 'friends.mp3',
+    title: 'Friends Theme'
   }
 };
 

@@ -71,8 +71,8 @@ Generate a structured JSON output mapping the planned assets according to the pr
         },
         audioVibe: { 
           type: "string", 
-          description: "Music vibe to overlay. Choose 'mission_impossible' for suspense/hacking/tech/action, 'pink_panther' for funny/sneaky/quirky, 'imperial_march' for villain/warning/fail, 'gonna_fly_now' for motivational/fitness/success, 'titanic_sad' for sad/emotional/dramatic.",
-          enum: ["mission_impossible", "pink_panther", "imperial_march", "gonna_fly_now", "titanic_sad"] 
+          description: "Music vibe to overlay. Choose 'mission_impossible' (suspense/hacking/action), 'pink_panther' (funny/quirky), 'imperial_march' (villain/warning), 'gonna_fly_now' (motivational/fitness), 'titanic_sad' (sad/dramatic), 'star_wars' (epic/space/adventure), 'rocky_orchestra' (motivational/classic), 'grease' (dance/musical/retro), 'entertainer' (piano/classic/fun), 'evergreen' (soft/romantic/calm), 'jaws_orchestra' (thriller/danger/shark), 'you_light_up' (inspirational/romantic), 'bond_orchestra' (spy/orchestral/action), 'roots' (historical/drama/heritage), 'bond_nobody' (sleek/classic/gentle), 'saturday_night_fever' (disco/dance/party), 'way_we_were' (nostalgic/emotional), 'sergeant_pepper' (psych-rock/classic/retro), 'godfather_orchestra' (mafia/classic/retro), 'ease_on_down' (upbeat/funky/happy), 'close_encounters' (sci-fi/grand/space), 'friends' (upbeat/comedy/friendship/social).",
+          enum: ["mission_impossible", "pink_panther", "imperial_march", "gonna_fly_now", "titanic_sad", "star_wars", "rocky_orchestra", "grease", "entertainer", "evergreen", "jaws_orchestra", "you_light_up", "bond_orchestra", "roots", "bond_nobody", "saturday_night_fever", "way_we_were", "sergeant_pepper", "godfather_orchestra", "ease_on_down", "close_encounters", "friends"] 
         }
       },
       required: ["productName", "ugcHooks", "selectedHook", "vibe", "bgVideoKeywords", "gifKeywords", "audioVibe"]
@@ -193,7 +193,7 @@ function getMockContent(description) {
     vibe = 'relatable';
   } else {
     // Random default selection
-    const audioOptions = ['mission_impossible', 'pink_panther', 'imperial_march', 'gonna_fly_now', 'titanic_sad'];
+    const audioOptions = ["mission_impossible", "pink_panther", "imperial_march", "gonna_fly_now", "titanic_sad", "star_wars", "rocky_orchestra", "grease", "entertainer", "evergreen", "jaws_orchestra", "you_light_up", "bond_orchestra", "roots", "bond_nobody", "saturday_night_fever", "way_we_were", "sergeant_pepper", "godfather_orchestra", "ease_on_down", "close_encounters", "friends"];
     audio = audioOptions[Math.floor(Math.random() * audioOptions.length)];
     
     const vibeOptions = ['energetic', 'calm', 'funny', 'aesthetic', 'relatable'];
@@ -213,12 +213,44 @@ function getMockContent(description) {
     audio = 'titanic_sad';
   } else if (lowercaseDesc.includes('epic') || lowercaseDesc.includes('action') || lowercaseDesc.includes('suspense') || lowercaseDesc.includes('mission') || lowercaseDesc.includes('hack')) {
     audio = 'mission_impossible';
-  } else if (lowercaseDesc.includes('villain') || lowercaseDesc.includes('evil') || lowercaseDesc.includes('fail') || lowercaseDesc.includes('darth') || lowercaseDesc.includes('star wars') || lowercaseDesc.includes('imperial')) {
+  } else if (lowercaseDesc.includes('villain') || lowercaseDesc.includes('evil') || lowercaseDesc.includes('fail') || lowercaseDesc.includes('darth') || lowercaseDesc.includes('imperial')) {
     audio = 'imperial_march';
   } else if (lowercaseDesc.includes('fitness') || lowercaseDesc.includes('motivation') || lowercaseDesc.includes('workout') || lowercaseDesc.includes('rocky') || lowercaseDesc.includes('win')) {
-    audio = 'gonna_fly_now';
+    audio = 'rocky_orchestra';
   } else if (lowercaseDesc.includes('funny') || lowercaseDesc.includes('sneaky') || lowercaseDesc.includes('comedy') || lowercaseDesc.includes('panther')) {
     audio = 'pink_panther';
+  } else if (lowercaseDesc.includes('godfather') || lowercaseDesc.includes('mafia') || lowercaseDesc.includes('crime') || lowercaseDesc.includes('gangster')) {
+    audio = 'godfather_orchestra';
+  } else if (lowercaseDesc.includes('bond') || lowercaseDesc.includes('spy') || lowercaseDesc.includes('agent') || lowercaseDesc.includes('007') || lowercaseDesc.includes('live and let die')) {
+    audio = 'bond_orchestra';
+  } else if (lowercaseDesc.includes('star wars') || lowercaseDesc.includes('galaxy') || lowercaseDesc.includes('space') || lowercaseDesc.includes('alien') || lowercaseDesc.includes('star_wars')) {
+    audio = 'star_wars';
+  } else if (lowercaseDesc.includes('piano') || lowercaseDesc.includes('entertainer') || lowercaseDesc.includes('ragtime')) {
+    audio = 'entertainer';
+  } else if (lowercaseDesc.includes('calm') || lowercaseDesc.includes('evergreen') || lowercaseDesc.includes('soft') || lowercaseDesc.includes('romantic')) {
+    audio = 'evergreen';
+  } else if (lowercaseDesc.includes('shark') || lowercaseDesc.includes('jaws') || lowercaseDesc.includes('danger') || lowercaseDesc.includes('ocean')) {
+    audio = 'jaws_orchestra';
+  } else if (lowercaseDesc.includes('light') || lowercaseDesc.includes('inspire') || lowercaseDesc.includes('hope')) {
+    audio = 'you_light_up';
+  } else if (lowercaseDesc.includes('history') || lowercaseDesc.includes('heritage') || lowercaseDesc.includes('roots')) {
+    audio = 'roots';
+  } else if (lowercaseDesc.includes('nobody') || lowercaseDesc.includes('better') || lowercaseDesc.includes('gentle')) {
+    audio = 'bond_nobody';
+  } else if (lowercaseDesc.includes('dance') || lowercaseDesc.includes('disco') || lowercaseDesc.includes('party') || lowercaseDesc.includes('saturday') || lowercaseDesc.includes('fever')) {
+    audio = 'saturday_night_fever';
+  } else if (lowercaseDesc.includes('nostalgia') || lowercaseDesc.includes('way we were') || lowercaseDesc.includes('past')) {
+    audio = 'way_we_were';
+  } else if (lowercaseDesc.includes('pepper') || lowercaseDesc.includes('beatles') || lowercaseDesc.includes('band')) {
+    audio = 'sergeant_pepper';
+  } else if (lowercaseDesc.includes('upbeat') || lowercaseDesc.includes('happy') || lowercaseDesc.includes('road') || lowercaseDesc.includes('ease')) {
+    audio = 'ease_on_down';
+  } else if (lowercaseDesc.includes('ufo') || lowercaseDesc.includes('alien') || lowercaseDesc.includes('encounters')) {
+    audio = 'close_encounters';
+  } else if (lowercaseDesc.includes('friend') || lowercaseDesc.includes('buddy') || lowercaseDesc.includes('social') || lowercaseDesc.includes('hug')) {
+    audio = 'friends';
+  } else if (lowercaseDesc.includes('grease') || lowercaseDesc.includes('musical') || lowercaseDesc.includes('retro')) {
+    audio = 'grease';
   }
 
   // 4. GIF keyword overrides
